@@ -2,7 +2,7 @@
 name: User stories (back)
 about: Describe the task
 title: 'feat[back]: '
-labels: enhancement
+labels: ''
 assignees: LURZU
 
 ---

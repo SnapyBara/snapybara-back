@@ -1,13 +1,13 @@
 ---
-name: User stories (android)
+name: Epic (android)
 about: Describe the task
-title: 'feat[android]:'
-labels: enhancement
+title: 'epic[android]:'
+labels: feat
 assignees: LURZU
 
 ---
 
-# User stories
+# Epic
 
 **What**
 
