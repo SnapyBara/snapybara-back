@@ -4,15 +4,18 @@ import { User, Session, AuthError } from '@supabase/supabase-js';
  * Utilitaires pour les tests Supabase
  */
 
-// Helper pour créer un AuthError mock
-export const createMockAuthError = (message: string, code?: string): AuthError => ({
-  message,
-  name: 'AuthError',
-  code: code ?? 'auth_error',
-  __isAuthError: true,
-});
+export const createMockAuthError = (
+  message: string,
+  code: string = 'auth_error',
+  status: number = 400,
+): AuthError =>
+  ({
+    message,
+    name: 'AuthError',
+    code,
+    status,
+  }) as unknown as AuthError;
 
-// Mock User par défaut
 export const createMockUser = (overrides: Partial<User> = {}): User => ({
   id: '123e4567-e89b-12d3-a456-426614174000',
   aud: 'authenticated',
@@ -30,7 +33,6 @@ export const createMockUser = (overrides: Partial<User> = {}): User => ({
   ...overrides,
 });
 
-// Mock Session par défaut
 export const createMockSession = (user?: User): Session => ({
   access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   refresh_token: 'refresh-token-123',
@@ -39,9 +41,7 @@ export const createMockSession = (user?: User): Session => ({
   user: user ?? createMockUser(),
 });
 
-// Codes d'erreur Supabase courants
 export const SupabaseErrorCodes = {
-  // Auth errors
   INVALID_CREDENTIALS: 'invalid_credentials',
   EMAIL_NOT_CONFIRMED: 'email_not_confirmed',
   TOO_MANY_REQUESTS: 'too_many_requests',
@@ -51,25 +51,36 @@ export const SupabaseErrorCodes = {
   USER_NOT_FOUND: 'user_not_found',
   TOKEN_EXPIRED: 'token_expired',
   REFRESH_TOKEN_NOT_FOUND: 'refresh_token_not_found',
-  
-  // Generic errors
   UNAUTHORIZED: 'unauthorized',
   FORBIDDEN: 'forbidden',
   NOT_FOUND: 'not_found',
   INTERNAL_ERROR: 'internal_error',
 } as const;
 
-// Factory pour créer des erreurs courantes
 export const createAuthErrors = {
-  invalidCredentials: () => createMockAuthError('Invalid credentials', SupabaseErrorCodes.INVALID_CREDENTIALS),
-  emailNotConfirmed: () => createMockAuthError('Email not confirmed', SupabaseErrorCodes.EMAIL_NOT_CONFIRMED),
-  userNotFound: () => createMockAuthError('User not found', SupabaseErrorCodes.USER_NOT_FOUND),
-  tokenExpired: () => createMockAuthError('Token expired', SupabaseErrorCodes.TOKEN_EXPIRED),
-  unauthorized: () => createMockAuthError('Unauthorized', SupabaseErrorCodes.UNAUTHORIZED),
-  tooManyRequests: () => createMockAuthError('Too many requests', SupabaseErrorCodes.TOO_MANY_REQUESTS),
+  invalidCredentials: () =>
+    createMockAuthError(
+      'Invalid credentials',
+      SupabaseErrorCodes.INVALID_CREDENTIALS,
+    ),
+  emailNotConfirmed: () =>
+    createMockAuthError(
+      'Email not confirmed',
+      SupabaseErrorCodes.EMAIL_NOT_CONFIRMED,
+    ),
+  userNotFound: () =>
+    createMockAuthError('User not found', SupabaseErrorCodes.USER_NOT_FOUND),
+  tokenExpired: () =>
+    createMockAuthError('Token expired', SupabaseErrorCodes.TOKEN_EXPIRED),
+  unauthorized: () =>
+    createMockAuthError('Unauthorized', SupabaseErrorCodes.UNAUTHORIZED),
+  tooManyRequests: () =>
+    createMockAuthError(
+      'Too many requests',
+      SupabaseErrorCodes.TOO_MANY_REQUESTS,
+    ),
 };
 
-// Types pour les réponses Supabase mockées
 export interface MockSupabaseResponse<T> {
   data: T;
   error: null;
@@ -80,18 +91,18 @@ export interface MockSupabaseErrorResponse {
   error: AuthError;
 }
 
-// Helpers pour créer des réponses mockées
 export const createSuccessResponse = <T>(data: T): MockSupabaseResponse<T> => ({
   data,
   error: null,
 });
 
-export const createErrorResponse = (error: AuthError): MockSupabaseErrorResponse => ({
+export const createErrorResponse = (
+  error: AuthError,
+): MockSupabaseErrorResponse => ({
   data: null,
   error,
 });
 
-// Helper pour mock SupabaseService complet
 export const createMockSupabaseService = () => ({
   signUp: jest.fn(),
   signIn: jest.fn(),
