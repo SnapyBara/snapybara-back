@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { validateEnvironment } from './config/env.validation';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { validateEnvironment } from './config/env.validation';
       }),
     }),
     AuthModule,
+    EmailModule,
   ],
 })
 export class AppModule {}

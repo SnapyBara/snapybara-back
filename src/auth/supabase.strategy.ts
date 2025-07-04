@@ -37,6 +37,7 @@ export class SupabaseStrategy extends PassportStrategy(Strategy, 'supabase') {
         return null;
       }
       return user;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_error) {
       return null;
     }

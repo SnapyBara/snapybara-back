@@ -37,6 +37,15 @@ async function bootstrap() {
     .addServer('https://api.snapybara.com', 'Production server')
     .build();
 
+  app.enableCors({
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://10.37.0.14:3000',
+      'http://10.37.0.15:3000',
+    ],
+    credentials: true,
+  });
   const document = SwaggerModule.createDocument(app, config);
 
   SwaggerModule.setup('api-docs', app, document, {
@@ -57,7 +66,7 @@ async function bootstrap() {
 
   SwaggerModule.setup('api-docs-json', app, document);
 
-  await app.listen(3000);
+  await app.listen(3000, '0.0.0.0');
   console.log(`🚀 Application is running on: ${await app.getUrl()}`);
   console.log(`📚 Swagger documentation: ${await app.getUrl()}/api-docs`);
 }

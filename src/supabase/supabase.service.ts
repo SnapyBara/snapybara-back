@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseModuleOptions } from './interfaces/supabase-module-options.interface';
 
 export const SUPABASE_MODULE_OPTIONS = 'SUPABASE_MODULE_OPTIONS';
@@ -23,7 +23,49 @@ export class SupabaseService {
     return this.supabase;
   }
 
-  // Auth methods
+  /**
+   * Retourne le client Supabase
+   */
+  getClient(): SupabaseClient {
+    return this.supabase;
+  }
+
+  /**
+   * Vérifie si un utilisateur existe par email
+   */
+  async getUserByEmail(email: string) {
+    const { data, error } = await this.supabase
+      .from('profiles') // ou 'users' selon votre structure
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    return { data, error };
+  }
+
+  /**
+   * Met à jour le profil utilisateur
+   */
+  async updateUserProfile(userId: string, updates: any) {
+    const { data, error } = await this.supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId);
+
+    return { data, error };
+  }
+
+  /**
+   * Crée un nouveau profil utilisateur
+   */
+  async createUserProfile(userData: any) {
+    const { data, error } = await this.supabase
+      .from('profiles')
+      .insert([userData]);
+
+    return { data, error };
+  }
+
   async signUp(email: string, password: string) {
     return this.supabase.auth.signUp({ email, password });
   }
@@ -48,22 +90,18 @@ export class SupabaseService {
     return this.supabase.auth.resetPasswordForEmail(email);
   }
 
-  // Database methods
   get db() {
     return this.supabase;
   }
 
-  // Storage methods
   get storage() {
     return this.supabase.storage;
   }
 
-  // Realtime methods
   get realtime() {
     return this.supabase.realtime;
   }
 
-  // Helper method to set auth for server-side operations
   setAuth(token: string): SupabaseClient {
     return createClient(this.options.supabaseUrl, this.options.supabaseKey, {
       ...this.options.supabaseOptions,
