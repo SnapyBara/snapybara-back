@@ -1,10 +1,10 @@
 import {
-  Body,
   Controller,
-  Post,
-  UseGuards,
   Get,
-  HttpCode,
+  UseGuards,
+  Request,
+  Logger,
+  HttpException,
   HttpStatus,
 } from '@nestjs/common';
 import {
@@ -12,211 +12,115 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-  ApiBody,
+  ApiUnauthorizedResponse,
+  ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
-import { User, Session } from '@supabase/supabase-js';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { SignupDto } from './dto/signup.dto';
-import { SupabaseAuthGuard } from './guards/auth.guard';
-import { CurrentUserRest } from '../common/decorators/current-user.decorator';
-
-interface AuthControllerResponse {
-  user: User | null;
-  session: Session | null;
-  message?: string;
-}
-
-interface SignOutResponse {
-  message: string;
-}
+import { SupabaseJwtGuard } from './guards/simple-jwt.guard';
+import {
+  AuthResponseDto,
+  CurrentUserResponseDto,
+  StatusResponseDto,
+  ErrorResponseDto,
+} from './dto/swagger-auth.dto';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private readonly logger = new Logger(AuthController.name);
 
-  @Post('signup')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new user account' })
-  @ApiResponse({
-    status: 201,
-    description: 'User successfully created',
-    schema: {
-      example: {
-        user: {
-          id: 'uuid',
-          email: 'user@example.com',
-          created_at: '2023-01-01T00:00:00Z',
-        },
-        session: {
-          access_token: 'jwt-token',
-          refresh_token: 'refresh-token',
-        },
-        message: 'User created successfully',
-      },
-    },
-  })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
-  @ApiResponse({ status: 409, description: 'User already exists' })
-  async signUp(@Body() signupDto: SignupDto): Promise<AuthControllerResponse> {
-    const response = await this.authService.signUp(
-      signupDto.email,
-      signupDto.password,
-    );
-    return {
-      user: response.user,
-      session: response.session as Session | null,
-      message: 'User created successfully',
-    };
-  }
+  constructor(private authService: AuthService) {}
 
-  @Post('signin')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Sign in with email and password' })
-  @ApiResponse({
-    status: 200,
-    description: 'User successfully authenticated',
-    schema: {
-      example: {
-        user: {
-          id: 'uuid',
-          email: 'user@example.com',
-        },
-        session: {
-          access_token: 'jwt-token',
-          refresh_token: 'refresh-token',
-        },
-        message: 'User signed in successfully',
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async signIn(@Body() loginDto: LoginDto): Promise<AuthControllerResponse> {
-    const response = await this.authService.signIn(
-      loginDto.email,
-      loginDto.password,
-    );
-    return {
-      user: response.user,
-      session: response.session as Session | null,
-      message: 'User signed in successfully',
-    };
-  }
-
-  @Post('signout')
-  @UseGuards(SupabaseAuthGuard)
+  @Get('profile')
+  @UseGuards(SupabaseJwtGuard)
   @ApiBearerAuth('JWT-auth')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Sign out current user' })
+  @ApiOperation({
+    summary: 'Get user profile',
+    description:
+      'Retrieves detailed profile information for the authenticated user',
+  })
   @ApiResponse({
     status: 200,
-    description: 'User successfully signed out',
-    schema: {
-      example: {
-        message: 'Successfully signed out',
-      },
-    },
+    description: 'User profile retrieved successfully',
+    type: AuthResponseDto,
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async signOut(): Promise<SignOutResponse> {
-    return this.authService.signOut();
+  @ApiUnauthorizedResponse({
+    description: 'Invalid or missing JWT token',
+    type: ErrorResponseDto,
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'Internal server error',
+    type: ErrorResponseDto,
+  })
+  async getProfile(@Request() req): Promise<AuthResponseDto> {
+    try {
+      const profile = await this.authService.getProfile(req.user.access_token);
+      return {
+        success: true,
+        data: profile,
+      };
+    } catch (error) {
+      this.logger.error('Get profile failed:', error);
+      throw new HttpException(
+        'Failed to get user profile',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Get('me')
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(SupabaseJwtGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({
-    status: 200,
-    description: 'Current user profile',
-    schema: {
-      example: {
-        id: 'uuid',
-        email: 'user@example.com',
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getProfile(@CurrentUserRest() user: User): User {
-    return user;
-  }
-
-  @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh authentication token' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        refresh_token: {
-          type: 'string',
-          description: 'The refresh token from signin response',
-        },
-      },
-      required: ['refresh_token'],
-    },
+  @ApiOperation({
+    summary: 'Get current user info',
+    description:
+      'Retrieves basic information about the currently authenticated user',
   })
   @ApiResponse({
     status: 200,
-    description: 'Token successfully refreshed',
-    schema: {
-      example: {
-        user: {
-          id: 'uuid',
-          email: 'user@example.com',
-        },
-        session: {
-          access_token: 'new-jwt-token',
-          refresh_token: 'new-refresh-token',
-        },
-        message: 'Token refreshed successfully',
-      },
-    },
+    description: 'Current user information retrieved successfully',
+    type: CurrentUserResponseDto,
   })
-  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refreshToken(
-    @Body('refresh_token') refreshToken: string,
-  ): Promise<AuthControllerResponse> {
-    const response = await this.authService.refreshToken(refreshToken);
+  @ApiUnauthorizedResponse({
+    description: 'Invalid or missing JWT token',
+    type: ErrorResponseDto,
+  })
+  async getCurrentUser(@Request() req): Promise<CurrentUserResponseDto> {
     return {
-      user: response.user,
-      session: response.session as Session | null,
-      message: 'Token refreshed successfully',
+      success: true,
+      data: {
+        id: req.user.id,
+        email: req.user.email,
+        full_name: req.user.full_name,
+        avatar_url: req.user.avatar_url,
+        authenticated: true,
+      },
     };
   }
 
-  @Post('reset-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send password reset email' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        email: {
-          type: 'string',
-          format: 'email',
-          description: 'Email address to send reset link to',
-        },
-      },
-      required: ['email'],
-    },
+  @Get('status')
+  @ApiTags('public')
+  @ApiOperation({
+    summary: 'Check authentication service status',
+    description:
+      'Public endpoint to check if the authentication service is running',
   })
   @ApiResponse({
     status: 200,
-    description: 'Password reset email sent',
-    schema: {
-      example: {
-        message: 'Password reset email sent',
-      },
-    },
+    description: 'Service status retrieved successfully',
+    type: StatusResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid email address' })
-  async resetPassword(
-    @Body('email') email: string,
-  ): Promise<{ message: string }> {
-    return this.authService.resetPassword(email);
+  getAuthStatus(): StatusResponseDto {
+    return {
+      status: 'OK',
+      message: 'SnapyBara Auth service is running',
+      authentication: 'Supabase JWT verification',
+      endpoints: {
+        profile: 'GET /auth/profile (protected)',
+        me: 'GET /auth/me (protected)',
+        status: 'GET /auth/status (public)',
+      },
+      timestamp: new Date().toISOString(),
+    };
   }
 }
