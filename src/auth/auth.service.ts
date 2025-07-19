@@ -1,91 +1,54 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { User } from '@supabase/supabase-js';
-import { SupabaseService } from '../supabase/supabase.service';
-
-interface SignUpResponse {
-  user: User | null;
-  session: any;
-}
-
-interface SignInResponse {
-  user: User | null;
-  session: any;
-}
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { SupabaseSimpleService } from '../supabase/supabase-simple.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  private readonly logger = new Logger(AuthService.name);
 
-  async signUp(email: string, password: string): Promise<SignUpResponse> {
-    const { data, error } = await this.supabaseService.signUp(email, password);
+  constructor(private supabaseService: SupabaseSimpleService) {}
 
-    if (error) {
-      throw new UnauthorizedException(error.message);
+  async getProfile(accessToken: string) {
+    try {
+      const {
+        data: { user },
+        error,
+      } = await this.supabaseService.getUser(accessToken);
+
+      if (error) {
+        this.logger.error('Error getting user profile:', error);
+        throw new UnauthorizedException('Invalid token');
+      }
+
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      return {
+        id: user.id,
+        email: user.email ?? '',
+        full_name: user.user_metadata?.full_name ?? '',
+        avatar_url: user.user_metadata?.avatar_url ?? '',
+        email_verified: !!user.email_confirmed_at,
+        provider: user.app_metadata?.provider ?? 'email',
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+      };
+    } catch (error) {
+      this.logger.error('Get profile service error:', error);
+      throw error;
     }
-
-    return {
-      user: data.user,
-      session: data.session,
-    };
   }
 
-  async signIn(email: string, password: string): Promise<SignInResponse> {
-    const { data, error } = await this.supabaseService.signIn(email, password);
-
-    if (error) {
-      throw new UnauthorizedException(error.message);
+  async validateToken(accessToken: string): Promise<boolean> {
+    try {
+      const {
+        data: { user },
+        error,
+      } = await this.supabaseService.getUser(accessToken);
+      return !error && !!user;
+    } catch (error) {
+      this.logger.error('Token validation error:', error);
+      return false;
     }
-
-    return {
-      user: data.user,
-      session: data.session,
-    };
-  }
-
-  async signOut(): Promise<{ message: string }> {
-    const { error } = await this.supabaseService.signOut();
-
-    if (error) {
-      throw new UnauthorizedException(error.message);
-    }
-
-    return { message: 'Successfully signed out' };
-  }
-
-  async getCurrentUser(accessToken: string): Promise<User | null> {
-    const {
-      data: { user },
-      error,
-    } = await this.supabaseService.getUser(accessToken);
-
-    if (error) {
-      throw new UnauthorizedException(error.message);
-    }
-
-    return user;
-  }
-
-  async refreshToken(refreshToken: string): Promise<SignInResponse> {
-    const { data, error } =
-      await this.supabaseService.refreshSession(refreshToken);
-
-    if (error) {
-      throw new UnauthorizedException(error.message);
-    }
-
-    return {
-      user: data.user,
-      session: data.session,
-    };
-  }
-
-  async resetPassword(email: string): Promise<{ message: string }> {
-    const { error } = await this.supabaseService.resetPasswordForEmail(email);
-
-    if (error) {
-      throw new UnauthorizedException(error.message);
-    }
-
-    return { message: 'Password reset email sent' };
   }
 }

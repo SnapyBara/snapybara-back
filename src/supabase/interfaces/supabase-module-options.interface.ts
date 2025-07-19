@@ -3,6 +3,7 @@ import { ModuleMetadata, Type } from '@nestjs/common';
 export interface SupabaseModuleOptions {
   supabaseUrl: string;
   supabaseKey: string;
+  supabaseServiceKey: string;
   supabaseOptions?: Record<string, any>;
 }
 

@@ -21,23 +21,13 @@ export class ConfigService {
   }
 
   get supabaseServiceKey(): string {
-    const key = process.env.SUPABASE_SERVICE_KEY;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!key) {
       throw new Error(
-        'SUPABASE_SERVICE_KEY is not defined in environment variables',
+        'SUPABASE_SERVICE_ROLE_KEY is not defined in environment variables',
       );
     }
     return key;
-  }
-
-  get supabaseJwtSecret(): string {
-    const secret = process.env.SUPABASE_JWT_SECRET;
-    if (!secret) {
-      throw new Error(
-        'SUPABASE_JWT_SECRET is not defined in environment variables',
-      );
-    }
-    return secret;
   }
 
   get port(): number {
@@ -49,13 +39,12 @@ export class ConfigService {
   }
 }
 
-// Simple validation function without external dependencies
+// Validation simplifiée - seulement les variables essentielles
 export function validateEnvironment(config: Record<string, unknown>) {
   const requiredVars = [
     'SUPABASE_URL',
     'SUPABASE_ANON_KEY',
-    'SUPABASE_SERVICE_KEY',
-    'SUPABASE_JWT_SECRET',
+    'SUPABASE_SERVICE_ROLE_KEY',
   ];
 
   for (const varName of requiredVars) {

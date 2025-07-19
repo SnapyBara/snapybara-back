@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
-import { PassportModule } from '@nestjs/passport';
-import { AuthService } from './auth.service';
+import { ConfigModule } from '@nestjs/config';
 import { AuthController } from './auth.controller';
-import { SupabaseStrategy } from './supabase.strategy';
-import { ConfigService } from '../config/env.validation';
+import { AuthService } from './auth.service';
+import { SupabaseSimpleService } from '../supabase/supabase-simple.service';
+import { SupabaseJwtGuard } from './guards/simple-jwt.guard';
 
 @Module({
-  imports: [PassportModule.register({ defaultStrategy: 'supabase' })],
+  imports: [ConfigModule],
   controllers: [AuthController],
-  providers: [AuthService, SupabaseStrategy, ConfigService],
-  exports: [AuthService, SupabaseStrategy],
+  providers: [AuthService, SupabaseSimpleService, SupabaseJwtGuard],
+  exports: [AuthService, SupabaseJwtGuard, SupabaseSimpleService],
 })
 export class AuthModule {}
