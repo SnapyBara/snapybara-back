@@ -1,22 +1,26 @@
 import { Controller, Get, Query, Res, Req, Post, Body } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { EmailService } from './email.service';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('email')
 export class EmailController {
   constructor(private readonly emailService: EmailService) {}
 
   @Post('send-confirmation')
+  @Public() // ✅ Route publique
   async sendEmailConfirmation(@Body() body: { email: string }) {
     return await this.emailService.sendEmailConfirmation(body.email);
   }
 
   @Post('send-reset-password')
+  @Public() // ✅ Route publique
   async sendPasswordResetEmail(@Body() body: { email: string }) {
     return await this.emailService.sendPasswordResetEmail(body.email);
   }
 
   @Get('confirm')
+  @Public() // ✅ Route publique - CRITIQUE pour la confirmation d'email
   async confirmEmail(
     @Query() query: Record<string, string>,
     @Req() req: Request,
@@ -28,7 +32,7 @@ export class EmailController {
       console.log('🔍 Query params reçus:', query);
 
       const userAgent = req.headers['user-agent'] ?? '';
-      const _isMobile =
+      const isMobile =
         /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
           userAgent,
         );
@@ -54,7 +58,11 @@ export class EmailController {
 
       if (confirmed === 'true') {
         console.log('✅ Confirmation réussie via paramètre confirmed');
-        return res.send(this.getSuccessPage(_isMobile));
+        if (isMobile) {
+          console.log('📱 Mobile détecté → Redirection vers app');
+          return res.redirect('snapybara://auth/email-confirmed');
+        }
+        return res.send(this.getSuccessPage(isMobile));
       }
 
       if (token || token_hash) {
@@ -69,7 +77,11 @@ export class EmailController {
             await this.emailService.confirmEmailWithSupabase(tokenToVerify);
           if (isValid) {
             console.log('✅ Token vérifié avec succès depuis template email');
-            return res.send(this.getSuccessPage(_isMobile));
+            if (isMobile) {
+              console.log('📱 Mobile détecté → Redirection vers app');
+              return res.redirect('snapybara://auth/email-confirmed');
+            }
+            return res.send(this.getSuccessPage(isMobile));
           } else {
             console.log('❌ Token invalide ou expiré');
             return res.status(400).send(this.getErrorPage());
@@ -79,25 +91,38 @@ export class EmailController {
           return res.status(400).send(this.getErrorPage());
         }
       }
+      
       if (access_token && refresh_token) {
         console.log("✅ Confirmation réussie - Tokens d'accès reçus");
-        return res.send(this.getSuccessPage(_isMobile));
+        if (isMobile) {
+          console.log('📱 Mobile détecté → Redirection vers app');
+          return res.redirect('snapybara://auth/email-confirmed');
+        }
+        return res.send(this.getSuccessPage(isMobile));
       }
 
       if (access_token) {
         console.log('✅ Confirmation réussie - Access token seul');
-        return res.send(this.getSuccessPage(_isMobile));
+        if (isMobile) {
+          console.log('📱 Mobile détecté → Redirection vers app');
+          return res.redirect('snapybara://auth/email-confirmed');
+        }
+        return res.send(this.getSuccessPage(isMobile));
       }
 
       if (type === 'signup' || type === 'email') {
         console.log('✅ Redirection de confirmation basique, type:', type);
-        return res.send(this.getSuccessPage(_isMobile));
+        if (isMobile) {
+          console.log('📱 Mobile détecté → Redirection vers app');
+          return res.redirect('snapybara://auth/email-confirmed');
+        }
+        return res.send(this.getSuccessPage(isMobile));
       }
 
       console.log(
         '⚠️ Pas de paramètres directs - utilisation du fragment reader',
       );
-      return res.send(this.getFragmentReaderPage(_isMobile));
+      return res.send(this.getFragmentReaderPage(isMobile));
     } catch (error) {
       console.error('💥 Erreur lors du traitement de la confirmation:', error);
       return res.status(500).send(this.getErrorPage());
@@ -107,6 +132,7 @@ export class EmailController {
   }
 
   @Get('reset-password')
+  @Public() // ✅ Route publique pour reset password
   resetPassword(
     @Query() query: any,
     @Req() req: Request,
@@ -152,6 +178,13 @@ export class EmailController {
 
       if (access_token && refresh_token) {
         console.log('✅ Tokens reçus, affichage du formulaire');
+        
+        if (isMobile) {
+          console.log('📱 Mobile détecté → Redirection vers app avec tokens');
+          const appUrl = `snapybara://auth/password-reset?access_token=${encodeURIComponent(access_token)}&refresh_token=${encodeURIComponent(refresh_token)}`;
+          return res.redirect(appUrl);
+        }
+        
         return res.send(
           this.getResetPasswordForm(access_token, refresh_token, expires_in),
         );
@@ -166,6 +199,7 @@ export class EmailController {
   }
 
   @Get('reset-password-form')
+  @Public() // ✅ Route publique pour le formulaire
   resetPasswordForm(@Query() query: any, @Res() res: Response) {
     console.log('🔍 Reset password form - Query params reçus:', query);
 
@@ -205,6 +239,7 @@ export class EmailController {
   }
 
   @Get('reset-password-error')
+  @Public() // ✅ Route publique pour les erreurs
   resetPasswordError(@Res() res: Response) {
     return res.status(400).send(this.getResetPasswordErrorPage());
   }

@@ -1,126 +1,104 @@
 import {
   Controller,
+  Post,
+  Body,
   Get,
   UseGuards,
-  Request,
-  Logger,
-  HttpException,
   HttpStatus,
+  HttpException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiUnauthorizedResponse,
-  ApiInternalServerErrorResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { SupabaseJwtGuard } from './guards/simple-jwt.guard';
-import {
-  AuthResponseDto,
-  CurrentUserResponseDto,
-  StatusResponseDto,
-  ErrorResponseDto,
-} from './dto/swagger-auth.dto';
+import { UsersService } from '../users/users.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Public } from './decorators/public.decorator';
+import { CurrentUser } from './decorators/current-user.decorator';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  private readonly logger = new Logger(AuthController.name);
+  constructor(
+    private readonly authService: AuthService,
+    private readonly usersService: UsersService,
+  ) {}
 
-  constructor(private authService: AuthService) {}
-
-  @Get('profile')
-  @UseGuards(SupabaseJwtGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Get user profile',
-    description:
-      'Retrieves detailed profile information for the authenticated user',
-  })
+  @Post('verify-token')
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
+  @ApiOperation({ summary: 'Verify Supabase JWT token' })
   @ApiResponse({
-    status: 200,
-    description: 'User profile retrieved successfully',
-    type: AuthResponseDto,
+    status: HttpStatus.OK,
+    description: 'Token is valid',
   })
-  @ApiUnauthorizedResponse({
-    description: 'Invalid or missing JWT token',
-    type: ErrorResponseDto,
-  })
-  @ApiInternalServerErrorResponse({
-    description: 'Internal server error',
-    type: ErrorResponseDto,
-  })
-  async getProfile(@Request() req): Promise<AuthResponseDto> {
+  async verifyToken(@Body('token') token: string) {
+    if (!token) {
+      throw new HttpException('Token is required', HttpStatus.BAD_REQUEST);
+    }
+
     try {
-      const profile = await this.authService.getProfile(req.user.access_token);
+      const user = await this.authService.validateSupabaseToken(token);
       return {
-        success: true,
-        data: profile,
+        valid: true,
+        user: {
+          id: user.mongoId,
+          supabaseId: user.supabaseId,
+          email: user.email,
+          username: user.username,
+          role: user.role,
+        },
       };
     } catch (error) {
-      this.logger.error('Get profile failed:', error);
-      throw new HttpException(
-        'Failed to get user profile',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      return {
+        valid: false,
+        error: error.message,
+      };
     }
   }
 
-  @Get('me')
-  @UseGuards(SupabaseJwtGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Get current user info',
-    description:
-      'Retrieves basic information about the currently authenticated user',
-  })
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get authenticated user profile' })
   @ApiResponse({
-    status: 200,
-    description: 'Current user information retrieved successfully',
-    type: CurrentUserResponseDto,
+    status: HttpStatus.OK,
+    description: 'User profile retrieved successfully',
   })
-  @ApiUnauthorizedResponse({
-    description: 'Invalid or missing JWT token',
-    type: ErrorResponseDto,
-  })
-  async getCurrentUser(@Request() req): Promise<CurrentUserResponseDto> {
+  async getProfile(@CurrentUser() currentUser: any) {
+    const user = await this.usersService.findOne(currentUser.mongoId);
     return {
-      success: true,
-      data: {
-        id: req.user.id,
-        email: req.user.email,
-        full_name: req.user.full_name,
-        avatar_url: req.user.avatar_url,
-        authenticated: true,
-      },
+      id: user._id,
+      supabaseId: user.supabaseId,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      level: user.level,
+      points: user.points,
+      profilePicture: user.profilePicture,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt,
     };
   }
 
-  @Get('status')
-  @ApiTags('public')
-  @ApiOperation({
-    summary: 'Check authentication service status',
-    description:
-      'Public endpoint to check if the authentication service is running',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Service status retrieved successfully',
-    type: StatusResponseDto,
-  })
-  getAuthStatus(): StatusResponseDto {
+  @Post('refresh-user')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Refresh user data from Supabase' })
+  async refreshUser(@CurrentUser() currentUser: any) {
+    // This would typically re-sync user data with Supabase
+    // For now, just return the current user data
+    const user = await this.usersService.findOne(currentUser.mongoId);
+    await this.usersService.updateLastLogin(currentUser.mongoId);
+    
     return {
-      status: 'OK',
-      message: 'SnapyBara Auth service is running',
-      authentication: 'Supabase JWT verification',
-      endpoints: {
-        profile: 'GET /auth/profile (protected)',
-        me: 'GET /auth/me (protected)',
-        status: 'GET /auth/status (public)',
+      message: 'User data refreshed successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        lastLoginAt: new Date(),
       },
-      timestamp: new Date().toISOString(),
     };
   }
 }

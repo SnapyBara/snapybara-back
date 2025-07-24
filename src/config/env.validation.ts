@@ -39,19 +39,49 @@ export class ConfigService {
   }
 }
 
-// Validation simplifiée - seulement les variables essentielles
+// Validation des variables d'environnement - essentielles et sécurité
 export function validateEnvironment(config: Record<string, unknown>) {
   const requiredVars = [
     'SUPABASE_URL',
     'SUPABASE_ANON_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
+    'MONGODB_URI',
   ];
 
+  const optionalVars = [
+    'SUPABASE_JWT_SECRET',
+    'SUPABASE_PROJECT_REF',
+    'THROTTLE_TTL',
+    'THROTTLE_LIMIT',
+    'PORT',
+    'NODE_ENV',
+  ];
+
+  // Vérifier les variables obligatoires
   for (const varName of requiredVars) {
     if (!config[varName]) {
       throw new Error(`Configuration validation error: ${varName} is required`);
     }
   }
 
-  return config;
+  // Ajouter des valeurs par défaut pour les variables optionnelles
+  const validatedConfig = { ...config };
+  
+  if (!validatedConfig.THROTTLE_TTL) {
+    validatedConfig.THROTTLE_TTL = '60';
+  }
+  
+  if (!validatedConfig.THROTTLE_LIMIT) {
+    validatedConfig.THROTTLE_LIMIT = '100';
+  }
+  
+  if (!validatedConfig.PORT) {
+    validatedConfig.PORT = '3000';
+  }
+  
+  if (!validatedConfig.NODE_ENV) {
+    validatedConfig.NODE_ENV = 'development';
+  }
+
+  return validatedConfig;
 }
