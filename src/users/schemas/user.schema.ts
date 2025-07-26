@@ -91,8 +91,6 @@ export class User {
 export const UserSchema = SchemaFactory.createForClass(User);
 
 // Index pour optimiser les requêtes
-UserSchema.index({ email: 1 });
-UserSchema.index({ supabaseId: 1 });
 UserSchema.index({ username: 1 });
 UserSchema.index({ points: -1 }); // Pour les classements
 UserSchema.index({ level: -1 });

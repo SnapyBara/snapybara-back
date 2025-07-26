@@ -15,6 +15,15 @@ import { MongoDBTestController } from './mongodb-test.controller';
 import { DatabaseConfig } from './config/database.config';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
+import { PointsModule } from './points/points.module';
+import { PhotosModule } from './photos/photos.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { CollectionsModule } from './collections/collections.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { StatisticsModule } from './statistics/statistics.module';
+import { SearchModule } from './search/search.module';
+import { UploadModule } from './upload/upload.module';
+import { GraphqlModule } from './graphql/graphql.module';
 
 @Module({
   imports: [
@@ -23,10 +32,12 @@ import { SecurityMiddleware } from './common/middleware/security.middleware';
       validate: validateEnvironment,
       envFilePath: ['.env.local', '.env'],
     }),
-    ThrottlerModule.forRoot([{
-      ttl: parseInt(process.env.THROTTLE_TTL || '60') * 1000, // Convert to milliseconds
-      limit: parseInt(process.env.THROTTLE_LIMIT || '100'),
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: parseInt(process.env.THROTTLE_TTL || '60') * 1000, // Convert to milliseconds
+        limit: parseInt(process.env.THROTTLE_LIMIT || '100'),
+      },
+    ]),
     MongooseModule.forRootAsync({
       useClass: DatabaseConfig,
     }),
@@ -48,6 +59,15 @@ import { SecurityMiddleware } from './common/middleware/security.middleware';
     ProtectedModule,
     HealthModule,
     EmailModule,
+    PointsModule,
+    PhotosModule,
+    ReviewsModule,
+    CollectionsModule,
+    NotificationsModule,
+    StatisticsModule,
+    SearchModule,
+    UploadModule,
+    GraphqlModule,
   ],
   controllers: [MongoDBTestController],
   providers: [
