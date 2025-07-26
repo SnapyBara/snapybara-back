@@ -2,11 +2,7 @@ import { User } from '@supabase/supabase-js';
 import { UserProfile } from '../../types/user.types';
 
 /**
- * Helpers pour l'authentification et la gestion des utilisateurs
- */
-
-/**
- * Extrait les informations essentielles d'un utilisateur Supabase
+ * Extract for userE
  */
 export function extractUserInfo(user: User): Partial<UserProfile> {
   return {
@@ -20,7 +16,7 @@ export function extractUserInfo(user: User): Partial<UserProfile> {
 }
 
 /**
- * Génère un nom d'affichage à partir des informations utilisateur
+ * Generate a display name for a user
  */
 export function generateDisplayName(user: UserProfile | User): string {
   if ('first_name' in user && user.first_name && user.last_name) {
@@ -39,16 +35,14 @@ export function generateDisplayName(user: UserProfile | User): string {
 }
 
 /**
- * Vérifie si un utilisateur a complété son profil
+ * Verify if a user profile is complete
  */
 export function isProfileComplete(profile: UserProfile): boolean {
   const requiredFields = ['first_name', 'last_name'] as const;
-  return requiredFields.every(
-    field => {
-      const value = profile[field as keyof UserProfile];
-      return value && String(value).trim() !== '';
-    }
-  );
+  return requiredFields.every((field) => {
+    const value = profile[field];
+    return typeof value === 'string' && value.trim() !== '';
+  });
 }
 
 /**

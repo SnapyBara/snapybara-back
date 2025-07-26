@@ -1,0 +1,104 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type User {
+  _id: ID!
+  supabaseId: String!
+  email: String!
+  username: String!
+  profilePicture: String
+  dateJoined: DateTime!
+  level: Int!
+  points: Int!
+  achievements: [String!]!
+  role: String!
+  isActive: Boolean!
+  photosUploaded: Int!
+  pointsOfInterestCreated: Int!
+  commentsWritten: Int!
+  likesReceived: Int!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type GeoLocation {
+  latitude: Float!
+  longitude: Float!
+  altitude: Float
+  accuracy: Float
+}
+
+type Photo {
+  _id: ID!
+  image: String!
+  description: String!
+  likes: Int!
+  uploadDate: DateTime!
+  uploadedBy: String!
+  pointOfInterest: String
+}
+
+type Review {
+  _id: ID!
+  content: String!
+  rating: Int!
+  createdAt: DateTime!
+  userId: String!
+}
+
+type ReviewStatistics {
+  averageRating: Float!
+  totalReviews: Int!
+  ratingDistribution: Int!
+}
+
+type PointOfInterest {
+  _id: ID!
+  name: String!
+  description: String!
+  category: String!
+  location: GeoLocation!
+  createdBy: String!
+  dateAdded: DateTime!
+  status: String!
+  rating: Float!
+  visitCount: Int!
+  viewCount: Int!
+  photos: [Photo!]
+  reviews: [Review!]
+  statistics: ReviewStatistics
+  getPhotos: [Photo!]!
+  getReviews: [Review!]!
+  getStatistics: ReviewStatistics
+}
+
+type UserActivity {
+  id: ID!
+  type: String!
+  userId: String!
+  userName: String!
+  timestamp: DateTime!
+  pointId: String
+  pointName: String
+  photoUrl: String
+  reviewText: String
+  rating: Float
+  metadata: JSON
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+type Query {
+  pointsWithFullDetails(latitude: Float!, longitude: Float!, radius: Float!, includePhotos: Boolean!, includeReviews: Boolean!): [PointOfInterest!]!
+  userActivityFeed(userId: String!, page: Float!, limit: Float!): [UserActivity!]!
+  recentPhotos(limit: Float!): [Photo!]!
+  topPhotos(limit: Float!): [Photo!]!
+  user(id: String!): User!
+}
