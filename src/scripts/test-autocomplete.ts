@@ -1,7 +1,66 @@
 import * as dotenv from 'dotenv';
 import { GooglePlacesService } from '../google-places/google-places.service';
+import { CacheService } from '../cache/cache.service';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
+
+// Mock du CacheService pour les tests
+class MockCacheService {
+  async get<T>(key: string): Promise<T | undefined> {
+    return undefined;
+  }
+
+  async set(key: string, value: any, options?: any): Promise<void> {
+    // Ne rien faire
+  }
+
+  async del(key: string): Promise<void> {
+    // Ne rien faire
+  }
+
+  async reset(): Promise<void> {
+    // Ne rien faire
+  }
+
+  generateGooglePlacesSearchKey(params: any): string {
+    return `test:${JSON.stringify(params)}`;
+  }
+
+  generateGooglePlacesTextSearchKey(params: any): string {
+    return `test:text:${JSON.stringify(params)}`;
+  }
+
+  generateAutocompleteKey(params: any): string {
+    return `test:auto:${JSON.stringify(params)}`;
+  }
+
+  generatePlaceDetailsKey(placeId: string): string {
+    return `test:details:${placeId}`;
+  }
+
+  generatePhotoKey(photoReference: string, maxWidth: number): string {
+    return `test:photo:${photoReference}:${maxWidth}`;
+  }
+
+  async getOrSet<T>(
+    key: string,
+    factory: () => Promise<T>,
+    options?: any,
+  ): Promise<T> {
+    return factory();
+  }
+
+  async getStats() {
+    return { hits: 0, misses: 0, hitRate: 0 };
+  }
+
+  private DEFAULT_TTL = {
+    SEARCH: 3600,
+    DETAILS: 86400,
+    PHOTOS: 604800,
+    AUTOCOMPLETE: 1800,
+  };
+}
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -12,7 +71,8 @@ async function testAutocomplete() {
     get: (key: string) => process.env[key],
   } as ConfigService;
 
-  const googlePlacesService = new GooglePlacesService(configService);
+  const mockCacheService = new MockCacheService() as any;
+  const googlePlacesService = new GooglePlacesService(configService, mockCacheService);
 
   console.log('🔍 Testing Google Places Autocomplete...\n');
 

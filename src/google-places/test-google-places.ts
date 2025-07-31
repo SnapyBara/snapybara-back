@@ -7,6 +7,64 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GooglePlacesService } from './google-places.service';
 
+// Mock du CacheService pour les tests
+class MockCacheService {
+  get<T>(key: string): T | undefined {
+    return undefined;
+  }
+
+  async set(key: string, value: any, options?: any): Promise<void> {
+    // Ne rien faire
+  }
+
+  async del(key: string): Promise<void> {
+    // Ne rien faire
+  }
+
+  async reset(): Promise<void> {
+    // Ne rien faire
+  }
+
+  generateGooglePlacesSearchKey(params: any): string {
+    return `test:${JSON.stringify(params)}`;
+  }
+
+  generateGooglePlacesTextSearchKey(params: any): string {
+    return `test:text:${JSON.stringify(params)}`;
+  }
+
+  generateAutocompleteKey(params: any): string {
+    return `test:auto:${JSON.stringify(params)}`;
+  }
+
+  generatePlaceDetailsKey(placeId: string): string {
+    return `test:details:${placeId}`;
+  }
+
+  generatePhotoKey(photoReference: string, maxWidth: number): string {
+    return `test:photo:${photoReference}:${maxWidth}`;
+  }
+
+  async getOrSet<T>(
+    key: string,
+    factory: () => Promise<T>,
+    options?: any,
+  ): Promise<T> {
+    return factory();
+  }
+
+  async getStats() {
+    return { hits: 0, misses: 0, hitRate: 0 };
+  }
+
+  private DEFAULT_TTL = {
+    SEARCH: 3600,
+    DETAILS: 86400,
+    PHOTOS: 604800,
+    AUTOCOMPLETE: 1800,
+  };
+}
+
 async function testGooglePlaces() {
   console.log('🚀 Test Google Places API Integration');
 
@@ -19,7 +77,8 @@ async function testGooglePlaces() {
   );
 
   const configService = app.get(ConfigService);
-  const googlePlacesService = new GooglePlacesService(configService);
+  const mockCacheService = new MockCacheService() as any;
+  const googlePlacesService = new GooglePlacesService(configService, mockCacheService);
 
   // Test 1: Vérifier la configuration
   console.log('\n📋 Test 1: Configuration');

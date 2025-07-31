@@ -25,6 +25,7 @@ import { SearchModule } from './search/search.module';
 import { UploadModule } from './upload/upload.module';
 import { GraphqlModule } from './graphql/graphql.module';
 import { GooglePlacesModule } from './google-places/google-places.module';
+import { CacheModule } from './cache/cache.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { GooglePlacesModule } from './google-places/google-places.module';
       validate: validateEnvironment,
       envFilePath: ['.env.local', '.env'],
     }),
+    CacheModule,
     ThrottlerModule.forRoot([
       {
         ttl: parseInt(process.env.THROTTLE_TTL || '60') * 1000, // Convert to milliseconds

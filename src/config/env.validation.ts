@@ -56,6 +56,9 @@ export function validateEnvironment(config: Record<string, unknown>) {
     'PORT',
     'NODE_ENV',
     'GOOGLE_PLACES_API_KEY', // Optionnel car l'app fonctionne sans
+    'REDIS_HOST',
+    'REDIS_PORT',
+    'REDIS_PASSWORD',
   ];
 
   // Vérifier les variables obligatoires
@@ -68,6 +71,11 @@ export function validateEnvironment(config: Record<string, unknown>) {
   // Avertissement si Google Places API key n'est pas configurée
   if (!config.GOOGLE_PLACES_API_KEY) {
     console.warn('Warning: GOOGLE_PLACES_API_KEY is not configured. Google Places features will be disabled.');
+  }
+  
+  // Avertissement si Redis n'est pas configuré
+  if (!config.REDIS_HOST) {
+    console.warn('Warning: Redis is not configured. Cache will be disabled.');
   }
 
   // Ajouter des valeurs par défaut pour les variables optionnelles

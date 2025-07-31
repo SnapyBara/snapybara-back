@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AutocompletePrediction, AutocompleteQueryDto, AutocompleteResponseDto } from './dto/autocomplete.dto';
+import { CacheService } from '../cache/cache.service';
 
 // Interfaces pour la nouvelle API Places (v1)
 interface PlaceV1 {
@@ -106,7 +107,10 @@ export class GooglePlacesService {
   private readonly baseUrl = 'https://maps.googleapis.com/maps/api/place';
   private readonly newApiUrl = 'https://places.googleapis.com/v1';
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private cacheService: CacheService,
+  ) {
     this.apiKey =
       this.configService.get<string>('GOOGLE_PLACES_API_KEY') || null;
     if (!this.apiKey) {
@@ -318,80 +322,96 @@ export class GooglePlacesService {
       return [];
     }
 
-    try {
-      const { latitude, longitude, radius = 5000, type, keyword } = params;
+    // Générer la clé de cache
+    const cacheKey = this.cacheService.generateGooglePlacesSearchKey({
+      latitude: params.latitude,
+      longitude: params.longitude,
+      radius: params.radius || 5000,
+      type: params.type,
+      keyword: params.keyword,
+    });
 
-      // Validation du rayon - Google Places accepte entre 0 et 50000 mètres
-      const safeRadius = Math.max(1, Math.min(radius || 5000, 50000));
+    // Utiliser le cache
+    return this.cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        try {
+          const { latitude, longitude, radius = 5000, type, keyword } = params;
 
-      const url = `${this.newApiUrl}/places:searchNearby`;
+          // Validation du rayon - Google Places accepte entre 0 et 50000 mètres
+          const safeRadius = Math.max(1, Math.min(radius || 5000, 50000));
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': this.apiKey,
-        'X-Goog-FieldMask': 'places.name,places.id,places.displayName,places.location,places.formattedAddress,places.types,places.rating,places.userRatingCount,places.photos,places.businessStatus,places.priceLevel',
-      };
+          const url = `${this.newApiUrl}/places:searchNearby`;
 
-      const body: any = {
-        locationRestriction: {
-          circle: {
-            center: {
-              latitude,
-              longitude,
+          const headers = {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': this.apiKey!,
+            'X-Goog-FieldMask': 'places.name,places.id,places.displayName,places.location,places.formattedAddress,places.types,places.rating,places.userRatingCount,places.photos,places.businessStatus,places.priceLevel',
+          };
+
+          const body: any = {
+            locationRestriction: {
+              circle: {
+                center: {
+                  latitude,
+                  longitude,
+                },
+                radius: safeRadius,
+              },
             },
-            radius: safeRadius,
-          },
-        },
-        maxResultCount: 20, // Augmenter pour avoir plus de résultats
-      };
+            maxResultCount: 20, // Augmenter pour avoir plus de résultats
+          };
 
-      // Pour obtenir des lieux naturels, inclure spécifiquement ces types
-      const natureTypes = [
-        'tourist_attraction',
-        'park',
-        'hiking_area',
-        'campground',
-        'national_park'
-        // Note: 'natural_feature' et 'scenic_point' ne sont pas supportés par la nouvelle API
-      ];
+          // Pour obtenir des lieux naturels, inclure spécifiquement ces types
+          const natureTypes = [
+            'tourist_attraction',
+            'park',
+            'hiking_area',
+            'campground',
+            'national_park'
+            // Note: 'natural_feature' et 'scenic_point' ne sont pas supportés par la nouvelle API
+          ];
 
-      // Si pas de type spécifique, chercher les attractions touristiques et lieux naturels
-      if (!type) {
-        body.includedTypes = natureTypes;
-      } else {
-        body.includedTypes = this.mapToNewApiTypes(type);
-      }
+          // Si pas de type spécifique, chercher les attractions touristiques et lieux naturels
+          if (!type) {
+            body.includedTypes = natureTypes;
+          } else {
+            body.includedTypes = this.mapToNewApiTypes(type);
+          }
 
-      this.logger.debug(
-        `Making new Places API nearby search request to: ${url} with radius: ${safeRadius}m, types: ${JSON.stringify(body.includedTypes)}`,
-      );
+          this.logger.debug(
+            `Making new Places API nearby search request to: ${url} with radius: ${safeRadius}m, types: ${JSON.stringify(body.includedTypes)}`,
+          );
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
+          const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+          });
 
-      const data = await response.json();
+          const data = await response.json();
 
-      if (data.error) {
-        this.logger.error(
-          `Google Places API (New) error: ${data.error.message}`,
-        );
-        return [];
-      }
+          if (data.error) {
+            this.logger.error(
+              `Google Places API (New) error: ${data.error.message}`,
+            );
+            return [];
+          }
 
-      // Convertir les résultats vers l'ancien format
-      const places = data.places || [];
-      
-      // Appliquer un filtre moins restrictif pour les lieux naturels
-      const filteredPlaces = this.filterRelevantPlacesWithNature(places);
-      
-      return filteredPlaces.map((place: PlaceV1) => this.convertV1ToLegacyFormat(place));
-    } catch (error) {
-      this.logger.error('Error during nearby search:', error);
-      return [];
-    }
+          // Convertir les résultats vers l'ancien format
+          const places = data.places || [];
+          
+          // Appliquer un filtre moins restrictif pour les lieux naturels
+          const filteredPlaces = this.filterRelevantPlacesWithNature(places);
+          
+          return filteredPlaces.map((place: PlaceV1) => this.convertV1ToLegacyFormat(place));
+        } catch (error) {
+          this.logger.error('Error during nearby search:', error);
+          return [];
+        }
+      },
+      { ttl: this.cacheService['DEFAULT_TTL'].SEARCH },
+    );
   }
 
   /**
@@ -407,14 +427,27 @@ export class GooglePlacesService {
       return [];
     }
 
-    try {
+    // Ne pas faire de recherche textuelle pour des requêtes trop courtes
+    if (!params.query || params.query.length < 3) {
+      this.logger.debug('Query too short for text search, returning empty results');
+      return [];
+    }
+
+    // Générer la clé de cache
+    const cacheKey = this.cacheService.generateGooglePlacesTextSearchKey(params);
+
+    // Utiliser le cache
+    return this.cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        try {
       const { query, latitude, longitude, radius } = params;
 
       const url = `${this.newApiUrl}/places:searchText`;
 
       const headers = {
         'Content-Type': 'application/json',
-        'X-Goog-Api-Key': this.apiKey,
+        'X-Goog-Api-Key': this.apiKey!,
         'X-Goog-FieldMask': 'places.name,places.id,places.displayName,places.location,places.formattedAddress,places.types,places.rating,places.userRatingCount,places.photos,places.businessStatus,places.priceLevel',
       };
 
@@ -484,6 +517,9 @@ export class GooglePlacesService {
       this.logger.error('Error during text search:', error);
       return [];
     }
+      },
+      { ttl: this.cacheService['DEFAULT_TTL'].SEARCH },
+    );
   }
 
   /**
@@ -495,7 +531,14 @@ export class GooglePlacesService {
       return null;
     }
 
-    try {
+    // Générer la clé de cache
+    const cacheKey = this.cacheService.generatePlaceDetailsKey(placeId);
+
+    // Utiliser le cache
+    return this.cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        try {
       // La nouvelle API utilise le format "places/PLACE_ID"
       const resourceName = placeId.startsWith('places/') 
         ? placeId 
@@ -504,7 +547,7 @@ export class GooglePlacesService {
       const url = `${this.newApiUrl}/${resourceName}`;
 
       const headers = {
-        'X-Goog-Api-Key': this.apiKey,
+        'X-Goog-Api-Key': this.apiKey!,
         'X-Goog-FieldMask': 'name,id,displayName,location,formattedAddress,types,rating,userRatingCount,photos,currentOpeningHours,nationalPhoneNumber,websiteUri,priceLevel,businessStatus',
       };
 
@@ -542,6 +585,9 @@ export class GooglePlacesService {
       this.logger.error('Error getting place details:', error);
       return null;
     }
+      },
+      { ttl: this.cacheService['DEFAULT_TTL'].DETAILS },
+    );
   }
 
   /**
@@ -717,7 +763,18 @@ export class GooglePlacesService {
       };
     }
 
-    try {
+    // Générer la clé de cache
+    const cacheKey = this.cacheService.generateAutocompleteKey({
+      input: params.input,
+      latitude: params.latitude,
+      longitude: params.longitude,
+    });
+
+    // Utiliser le cache
+    return this.cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        try {
       const { input, latitude, longitude, radius } = params;
 
       // Utiliser l'ancienne API Places Autocomplete qui est plus stable
@@ -725,7 +782,7 @@ export class GooglePlacesService {
       
       const queryParams = new URLSearchParams({
         input: input,
-        key: this.apiKey,
+        key: this.apiKey!,
         language: 'fr',
         types: 'geocode|establishment', // Villes, régions et établissements
       });
@@ -769,39 +826,55 @@ export class GooglePlacesService {
           secondaryText: prediction.structured_formatting?.secondary_text || '',
           types: prediction.types || [],
           distanceMeters: prediction.distance_meters,
-        }))
-        // Filtrer pour garder seulement les lieux pertinents
-        .filter((pred: AutocompletePrediction) => {
-          // Garder les villes, régions, pays et points d'intérêt
-          const relevantTypes = [
-            'locality',
-            'sublocality',
-            'administrative_area_level_1',
-            'administrative_area_level_2',
-            'country',
-            'point_of_interest',
-            'establishment',
-            'natural_feature',
-            'park',
-            'tourist_attraction',
-            'route', // Pour les rues
-            'geocode',
-          ];
-          
-          return pred.types.some(type => relevantTypes.includes(type));
-        });
+        }));
+        
+      this.logger.debug(`Autocomplete: ${predictions.length} predictions found before filtering`);
+      
+      // Temporairement, ne pas filtrer pour déboguer
+      const filteredPredictions = predictions;
+      
+      /*
+      // Filtrer pour garder seulement les lieux pertinents
+      const filteredPredictions = predictions.filter((pred: AutocompletePrediction) => {
+        // Garder les villes, régions, pays et points d'intérêt
+        const relevantTypes = [
+          'locality',
+          'sublocality',
+          'administrative_area_level_1',
+          'administrative_area_level_2',
+          'country',
+          'point_of_interest',
+          'establishment',
+          'natural_feature',
+          'park',
+          'tourist_attraction',
+          'route', // Pour les rues
+          'geocode',
+        ];
+        
+        return pred.types.some(type => relevantTypes.includes(type));
+      });
+      */
+      
+      this.logger.debug(`Autocomplete: ${filteredPredictions.length} predictions after filtering`);
+      filteredPredictions.forEach((pred, index) => {
+        this.logger.debug(`  ${index + 1}. ${pred.mainText} - ${pred.secondaryText} (types: ${pred.types.join(', ')})`);
+      });
 
-      return {
-        predictions,
-        status: 'OK',
-      };
-    } catch (error) {
-      this.logger.error('Error during autocomplete request:', error);
-      return {
-        predictions: [],
-        status: 'ERROR',
-      };
-    }
+        return {
+          predictions: filteredPredictions,
+          status: 'OK',
+        };
+      } catch (error) {
+        this.logger.error('Error during autocomplete request:', error);
+        return {
+          predictions: [],
+          status: 'ERROR',
+        };
+      }
+    },
+    { ttl: this.cacheService['DEFAULT_TTL'].AUTOCOMPLETE },
+  );
   }
 
   /**

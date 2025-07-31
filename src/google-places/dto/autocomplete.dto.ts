@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class AutocompleteQueryDto {
   @ApiProperty({
@@ -15,6 +16,7 @@ export class AutocompleteQueryDto {
     required: false,
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   latitude?: number;
 
@@ -24,6 +26,7 @@ export class AutocompleteQueryDto {
     required: false,
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   longitude?: number;
 
@@ -35,6 +38,7 @@ export class AutocompleteQueryDto {
     maximum: 50000,
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(50000)
