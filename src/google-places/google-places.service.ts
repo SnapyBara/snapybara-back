@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AutocompletePrediction, AutocompleteQueryDto, AutocompleteResponseDto } from './dto/autocomplete.dto';
 
 // Interfaces pour la nouvelle API Places (v1)
 interface PlaceV1 {
@@ -624,10 +625,23 @@ export class GooglePlacesService {
     const nameLower = name.toLowerCase();
     
     // Mots-clés pour les montagnes
-    const mountainKeywords = ['pic', 'mont', 'sommet', 'col', 'crête', 'peak', 'mountain', 'hill'];
+    const mountainKeywords = ['pic ', 'mont ', 'sommet', 'col ', 'crête', 'peak', 'mountain', 'hill'];
+    const mountainExclusions = ['montcalm', 'montpellier', 'montreal', 'montgomery']; // Noms de villes/quartiers à exclure
+    
     if (mountainKeywords.some(keyword => nameLower.includes(keyword))) {
-      this.logger.debug(`Categorizing "${name}" as mountain based on name`);
-      return 'mountain';
+      // Vérifier que ce n'est pas un nom de ville ou de quartier
+      if (!mountainExclusions.some(exclusion => nameLower.includes(exclusion))) {
+        this.logger.debug(`Categorizing "${name}" as mountain based on name`);
+        return 'mountain';
+      }
+    }
+    
+    // Mots-clés pour les parcs, jardins et paysages
+    const landscapeKeywords = ['parc', 'park', 'jardin', 'garden', 'jardins', 'gardens', 'square', 
+                              'esplanade', 'promenade', 'botanical', 'botanique', 'plantes', 'plants'];
+    if (landscapeKeywords.some(keyword => nameLower.includes(keyword))) {
+      this.logger.debug(`Categorizing "${name}" as landscape based on name`);
+      return 'landscape';
     }
     
     // Mots-clés pour les points de vue et paysages
@@ -673,7 +687,7 @@ export class GooglePlacesService {
     // Si c'est un établissement et qu'on n'a pas trouvé mieux, vérifier si c'est naturel
     if (types.includes('establishment') || types.includes('point_of_interest') || types.includes('tourist_attraction')) {
       // Si le lieu contient des mots liés à la nature, le classer en paysage
-      const natureKeywords = ['parc', 'park', 'jardin', 'garden', 'nature', 'natural', 
+      const natureKeywords = ['nature', 'natural', 
                               'réserve', 'reserve', 'site', 'gorge', 'canyon'];
       if (natureKeywords.some(keyword => nameLower.includes(keyword))) {
         this.logger.debug(`Categorizing "${name}" as landscape based on nature keywords`);
@@ -685,6 +699,109 @@ export class GooglePlacesService {
     
     // Sinon, retourner la catégorie par défaut
     return defaultCategory;
+  }
+
+  /**
+   * Obtenir des suggestions d'autocomplétion pour les lieux
+   */
+  async getAutocomplete(
+    params: AutocompleteQueryDto,
+  ): Promise<AutocompleteResponseDto> {
+    if (!this.apiKey) {
+      this.logger.warn(
+        'Google Places API key not configured, returning empty predictions',
+      );
+      return {
+        predictions: [],
+        status: 'API_KEY_MISSING',
+      };
+    }
+
+    try {
+      const { input, latitude, longitude, radius } = params;
+
+      // Utiliser l'ancienne API Places Autocomplete qui est plus stable
+      const baseUrl = `${this.baseUrl}/autocomplete/json`;
+      
+      const queryParams = new URLSearchParams({
+        input: input,
+        key: this.apiKey,
+        language: 'fr',
+        types: 'geocode|establishment', // Villes, régions et établissements
+      });
+
+      // Ajouter le biais de localisation si fourni
+      if (latitude && longitude) {
+        queryParams.append('location', `${latitude},${longitude}`);
+        if (radius) {
+          const safeRadius = Math.max(1, Math.min(radius || 5000, 50000));
+          queryParams.append('radius', safeRadius.toString());
+        } else {
+          queryParams.append('radius', '50000'); // 50km par défaut
+        }
+      }
+
+      const url = `${baseUrl}?${queryParams.toString()}`;
+      
+      this.logger.debug(`Making Places Autocomplete request to: ${url}`);
+
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      this.logger.debug(`Response status: ${data.status}`);
+      
+      if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+        this.logger.error(
+          `Google Places Autocomplete API error: ${data.status} - ${data.error_message || ''}`,
+        );
+        return {
+          predictions: [],
+          status: data.status,
+        };
+      }
+
+      // Convertir les résultats au format attendu
+      const predictions: AutocompletePrediction[] = (data.predictions || [])
+        .map((prediction: any) => ({
+          placeId: prediction.place_id,
+          description: prediction.description,
+          mainText: prediction.structured_formatting?.main_text || prediction.description,
+          secondaryText: prediction.structured_formatting?.secondary_text || '',
+          types: prediction.types || [],
+          distanceMeters: prediction.distance_meters,
+        }))
+        // Filtrer pour garder seulement les lieux pertinents
+        .filter((pred: AutocompletePrediction) => {
+          // Garder les villes, régions, pays et points d'intérêt
+          const relevantTypes = [
+            'locality',
+            'sublocality',
+            'administrative_area_level_1',
+            'administrative_area_level_2',
+            'country',
+            'point_of_interest',
+            'establishment',
+            'natural_feature',
+            'park',
+            'tourist_attraction',
+            'route', // Pour les rues
+            'geocode',
+          ];
+          
+          return pred.types.some(type => relevantTypes.includes(type));
+        });
+
+      return {
+        predictions,
+        status: 'OK',
+      };
+    } catch (error) {
+      this.logger.error('Error during autocomplete request:', error);
+      return {
+        predictions: [],
+        status: 'ERROR',
+      };
+    }
   }
 
   /**
@@ -705,8 +822,9 @@ export class GooglePlacesService {
       'forest': 'forest',
       'national_park': 'forest',
       'park': 'landscape',
-      'campground': 'forest',
+      'botanical_garden': 'landscape',
       'garden': 'landscape',
+      'campground': 'forest',
       
       // Eau
       'waterfall': 'waterfall',

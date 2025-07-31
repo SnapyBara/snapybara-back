@@ -24,6 +24,7 @@ import { StatisticsModule } from './statistics/statistics.module';
 import { SearchModule } from './search/search.module';
 import { UploadModule } from './upload/upload.module';
 import { GraphqlModule } from './graphql/graphql.module';
+import { GooglePlacesModule } from './google-places/google-places.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { GraphqlModule } from './graphql/graphql.module';
     SearchModule,
     UploadModule,
     GraphqlModule,
+    GooglePlacesModule,
   ],
   controllers: [MongoDBTestController],
   providers: [
