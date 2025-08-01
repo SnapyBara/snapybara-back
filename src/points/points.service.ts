@@ -13,7 +13,12 @@ import {
 import { CreatePointOfInterestDto, POICategory } from './dto/create-point.dto';
 import { UpdatePointOfInterestDto } from './dto/update-point.dto';
 import { SearchPointsDto } from './dto/search-points.dto';
+import { CreatePointWithPhotosDto } from './dto/create-point-with-photos.dto';
 import { GooglePlacesService } from '../google-places/google-places.service';
+import { PhotosService } from '../photos/photos.service';
+import { UploadService } from '../upload/upload.service';
+import { Photo } from '../photos/schemas/photo.schema';
+import * as sharp from 'sharp';
 
 @Injectable()
 export class PointsService {
@@ -23,6 +28,8 @@ export class PointsService {
     @InjectModel(PointOfInterest.name)
     private pointModel: Model<PointOfInterestDocument>,
     private googlePlacesService: GooglePlacesService,
+    private photosService: PhotosService,
+    private uploadService: UploadService,
   ) {}
 
   /**
@@ -55,6 +62,194 @@ export class PointsService {
       },
     });
     return createdPoint.save();
+  }
+
+  /**
+   * Créer un point d'intérêt avec des photos
+   */
+  async createWithPhotos(
+    createPointWithPhotosDto: CreatePointWithPhotosDto,
+    userId: string,
+  ): Promise<{
+    point: PointOfInterest;
+    photos: Photo[];
+  }> {
+    const session = await this.pointModel.db.startSession();
+    session.startTransaction();
+
+    try {
+      // 1. Créer le point d'intérêt
+      const pointData = {
+        name: createPointWithPhotosDto.name,
+        description: createPointWithPhotosDto.description,
+        latitude: createPointWithPhotosDto.latitude,
+        longitude: createPointWithPhotosDto.longitude,
+        location: {
+          type: 'Point',
+          coordinates: [
+            createPointWithPhotosDto.longitude,
+            createPointWithPhotosDto.latitude,
+          ],
+        },
+        category: createPointWithPhotosDto.category,
+        userId: new Types.ObjectId(userId),
+        status: 'pending', // En attente de validation
+        isPublic: createPointWithPhotosDto.isPublic ?? true,
+        tags: createPointWithPhotosDto.tags || [],
+        address: createPointWithPhotosDto.address,
+        metadata: {
+          ...createPointWithPhotosDto.metadata,
+          googlePlaceId: createPointWithPhotosDto.googlePlaceId,
+          bestTimeToVisit: createPointWithPhotosDto.bestTimeToVisit,
+          accessibilityInfo: createPointWithPhotosDto.accessibilityInfo,
+          photographyTips: createPointWithPhotosDto.photographyTips,
+          isFreeAccess: createPointWithPhotosDto.isFreeAccess,
+          requiresPermission: createPointWithPhotosDto.requiresPermission,
+          difficulty: createPointWithPhotosDto.difficulty,
+        },
+        statistics: {
+          averageRating: 0,
+          totalReviews: 0,
+          totalPhotos: createPointWithPhotosDto.photos.length,
+          totalLikes: 0,
+        },
+      };
+
+      const createdPoint = new this.pointModel(pointData);
+      await createdPoint.save({ session });
+
+      // 2. Traiter et sauvegarder les photos
+      const uploadedPhotos: Photo[] = [];
+
+      for (const photoDto of createPointWithPhotosDto.photos) {
+        try {
+          let photoData;
+
+          // Si c'est une base64, la convertir en buffer
+          if (photoDto.imageData.startsWith('data:image')) {
+            const matches = photoDto.imageData.match(/^data:image\/(\w+);base64,(.+)$/);
+            if (!matches) {
+              throw new BadRequestException('Invalid base64 image format');
+            }
+
+            const imageBuffer = Buffer.from(matches[2], 'base64');
+            const mimeType = `image/${matches[1]}`;
+
+            // Créer un faux objet Multer.File
+            const file: Express.Multer.File = {
+              buffer: imageBuffer,
+              mimetype: mimeType,
+              originalname: `photo-${Date.now()}.${matches[1]}`,
+              size: imageBuffer.length,
+              fieldname: 'photo',
+              encoding: '7bit',
+              destination: '',
+              filename: '',
+              path: '',
+              stream: null as any,
+            };
+
+            // Utiliser le service d'upload
+            photoData = await this.uploadService.uploadPhoto(file, userId);
+          } else if (photoDto.imageData.startsWith('http')) {
+            // Si c'est une URL, la télécharger d'abord
+            const response = await fetch(photoDto.imageData);
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            
+            const contentType = response.headers.get('content-type') || 'image/jpeg';
+            
+            const file: Express.Multer.File = {
+              buffer,
+              mimetype: contentType,
+              originalname: `photo-${Date.now()}.jpg`,
+              size: buffer.length,
+              fieldname: 'photo',
+              encoding: '7bit',
+              destination: '',
+              filename: '',
+              path: '',
+              stream: null as any,
+            };
+
+            photoData = await this.uploadService.uploadPhoto(file, userId);
+          } else {
+            throw new BadRequestException('Invalid image data format');
+          }
+
+          // Extraire les données EXIF si disponibles
+          let exifData = {};
+          if (photoDto.metadata) {
+            exifData = {
+              camera: photoDto.metadata.camera,
+              lens: photoDto.metadata.lens,
+              focalLength: photoDto.metadata.focalLength,
+              aperture: photoDto.metadata.aperture,
+              shutterSpeed: photoDto.metadata.shutterSpeed,
+              iso: photoDto.metadata.iso,
+              capturedAt: photoDto.metadata.capturedAt,
+              weather: photoDto.metadata.weather,
+              timeOfDay: photoDto.metadata.timeOfDay,
+            };
+          }
+
+          // Créer la photo dans la base de données
+          const photo = await this.photosService.create(
+            {
+              pointId: createdPoint._id.toString(),
+              url: photoData.url,
+              thumbnailUrl: photoData.thumbnailUrl,
+              mediumUrl: photoData.mediumUrl,
+              caption: photoDto.caption,
+              metadata: {
+                ...photoData.metadata,
+                ...exifData,
+              },
+              tags: photoDto.tags || [],
+              isPublic: createPointWithPhotosDto.isPublic ?? true,
+            },
+            userId,
+            session,
+          );
+
+          uploadedPhotos.push(photo);
+        } catch (error) {
+          this.logger.error('Error uploading photo:', error);
+          // Continuer avec les autres photos en cas d'erreur
+        }
+      }
+
+      // 3. Mettre à jour les statistiques du point si des photos ont été uploadées
+      if (uploadedPhotos.length > 0) {
+        await this.pointModel.updateOne(
+          { _id: createdPoint._id },
+          { 
+            $set: { 
+              'statistics.totalPhotos': uploadedPhotos.length 
+            } 
+          },
+          { session },
+        );
+      }
+
+      await session.commitTransaction();
+
+      // 4. Récupérer le point avec les informations de l'utilisateur
+      const populatedPoint = await this.pointModel
+        .findById(createdPoint._id)
+        .populate('userId', 'username profilePicture')
+        .exec();
+
+      return {
+        point: populatedPoint!,
+        photos: uploadedPhotos,
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   async findAll(searchDto: SearchPointsDto): Promise<{

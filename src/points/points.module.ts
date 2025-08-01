@@ -7,6 +7,8 @@ import {
   PointOfInterestSchema,
 } from './schemas/point-of-interest.schema';
 import { GooglePlacesModule } from '../google-places/google-places.module';
+import { PhotosModule } from '../photos/photos.module';
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { GooglePlacesModule } from '../google-places/google-places.module';
       { name: PointOfInterest.name, schema: PointOfInterestSchema },
     ]),
     GooglePlacesModule,
+    PhotosModule,
+    UploadModule,
   ],
   controllers: [PointsController],
   providers: [PointsService],

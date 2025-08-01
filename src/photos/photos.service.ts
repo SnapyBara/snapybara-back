@@ -16,14 +16,18 @@ export class PhotosService {
     private photoModel: Model<PhotoDocument>,
   ) {}
 
-  async create(createPhotoDto: CreatePhotoDto, userId: string): Promise<Photo> {
+  async create(
+    createPhotoDto: CreatePhotoDto,
+    userId: string,
+    session?: any,
+  ): Promise<Photo> {
     const createdPhoto = new this.photoModel({
       ...createPhotoDto,
       userId: new Types.ObjectId(userId),
       pointId: new Types.ObjectId(createPhotoDto.pointId),
       status: 'pending',
     });
-    return createdPhoto.save();
+    return createdPhoto.save({ session });
   }
 
   async findAll(filters: {

@@ -21,6 +21,7 @@ import { CreatePointOfInterestDto } from './dto/create-point.dto';
 import { UpdatePointOfInterestDto } from './dto/update-point.dto';
 import { SearchPointsDto } from './dto/search-points.dto';
 import { ImportGooglePlacesDto } from './dto/import-google-places.dto';
+import { CreatePointWithPhotosDto } from './dto/create-point-with-photos.dto';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 
 @ApiTags('points')
@@ -35,6 +36,31 @@ export class PointsController {
   @ApiResponse({ status: 201, description: 'Point created successfully' })
   create(@Body() createPointDto: CreatePointOfInterestDto, @Request() req) {
     return this.pointsService.create(createPointDto, req.user.id);
+  }
+
+  @Post('with-photos')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new point of interest with photos' })
+  @ApiResponse({
+    status: 201,
+    description: 'Point created successfully with photos',
+    schema: {
+      type: 'object',
+      properties: {
+        point: { type: 'object' },
+        photos: { type: 'array' },
+      },
+    },
+  })
+  createWithPhotos(
+    @Body() createPointWithPhotosDto: CreatePointWithPhotosDto,
+    @Request() req,
+  ) {
+    return this.pointsService.createWithPhotos(
+      createPointWithPhotosDto,
+      req.user.id,
+    );
   }
 
   @Get()
