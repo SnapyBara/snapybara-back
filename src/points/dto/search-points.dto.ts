@@ -117,4 +117,13 @@ export class SearchPointsDto {
   @IsOptional()
   @IsEnum(['distance', 'rating', 'recent', 'popular'])
   sortBy?: string = 'distance';
+
+  @ApiPropertyOptional({ 
+    description: 'Include Google Places results in the search',
+    default: false 
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
+  includeGooglePlaces?: boolean;
 }

@@ -102,7 +102,7 @@ async function testSearch() {
     console.log(`\nRésultats hybrides:`);
     console.log(`- Total: ${hybridResults.total}`);
     console.log(`- MongoDB: ${hybridResults.sources.mongodb}`);
-    console.log(`- Google Places: ${hybridResults.sources.googlePlaces}`);
+    console.log(`- OpenStreetMap: ${hybridResults.sources.openstreetmap}`);
     console.log(`\nPoints trouvés:`);
     hybridResults.data.forEach((point) => {
       console.log(`  - ${point.name} (${point.category})`);

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { validateEnvironment } from './config/env.validation';
@@ -26,6 +27,7 @@ import { UploadModule } from './upload/upload.module';
 import { GraphqlModule } from './graphql/graphql.module';
 import { GooglePlacesModule } from './google-places/google-places.module';
 import { CacheModule } from './cache/cache.module';
+import { OverpassModule } from './overpass/overpass.module';
 
 @Module({
   imports: [
@@ -34,6 +36,7 @@ import { CacheModule } from './cache/cache.module';
       validate: validateEnvironment,
       envFilePath: ['.env.local', '.env'],
     }),
+    ScheduleModule.forRoot(),
     CacheModule,
     ThrottlerModule.forRoot([
       {
@@ -72,6 +75,7 @@ import { CacheModule } from './cache/cache.module';
     UploadModule,
     GraphqlModule,
     GooglePlacesModule,
+    OverpassModule,
   ],
   controllers: [MongoDBTestController],
   providers: [

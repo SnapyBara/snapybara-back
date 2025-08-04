@@ -19,6 +19,9 @@ export class CacheService {
     GOOGLE_PLACES_AUTOCOMPLETE: 'gp:autocomplete:',
     POINTS_SEARCH: 'points:search:',
     POINTS_DETAILS: 'points:details:',
+    OVERPASS_SEARCH: 'overpass:search:',
+    OVERPASS_AREA: 'overpass:area:',
+    OVERPASS_NOMINATIM: 'overpass:nominatim:',
   };
 
   // TTL par défaut pour chaque type de cache (en secondes)
@@ -27,6 +30,9 @@ export class CacheService {
     DETAILS: 86400, // 24 heures
     PHOTOS: 604800, // 7 jours
     AUTOCOMPLETE: 1800, // 30 minutes
+    OVERPASS_SEARCH: 7200, // 2 heures pour Overpass (changements moins fréquents)
+    OVERPASS_AREA: 10800, // 3 heures pour les zones prédéfinies
+    OVERPASS_NOMINATIM: 3600, // 1 heure pour Nominatim
   };
 
   constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
@@ -211,5 +217,116 @@ export class CacheService {
       misses: 0,
       hitRate: 0,
     };
+  }
+
+  /**
+   * Générer une clé de cache pour les recherches Overpass
+   */
+  generateOverpassSearchKey(params: {
+    latitude: number;
+    longitude: number;
+    radius: number;
+    categories?: string[];
+  }): string {
+    const { latitude, longitude, radius, categories } = params;
+    // Arrondir à 3 décimales pour grouper les recherches proches
+    const lat = Math.round(latitude * 1000) / 1000;
+    const lng = Math.round(longitude * 1000) / 1000;
+    
+    let key = `${this.PREFIXES.OVERPASS_SEARCH}${lat},${lng},${radius}`;
+    if (categories && categories.length > 0) {
+      key += `:${categories.sort().join(',')}`;
+    }
+    
+    return key;
+  }
+
+  /**
+   * Générer une clé de cache pour les zones Overpass
+   */
+  generateOverpassAreaKey(lat: number, lon: number, radiusKm: number): string {
+    // Arrondir à 2 décimales pour les zones (moins de précision nécessaire)
+    const roundedLat = Math.round(lat * 100) / 100;
+    const roundedLon = Math.round(lon * 100) / 100;
+    return `${this.PREFIXES.OVERPASS_AREA}${roundedLat},${roundedLon},${radiusKm}`;
+  }
+
+  /**
+   * Générer une clé de cache pour Nominatim
+   */
+  generateNominatimKey(category: string, bounds: {
+    minLat: number;
+    minLon: number;
+    maxLat: number;
+    maxLon: number;
+  }): string {
+    const { minLat, minLon, maxLat, maxLon } = bounds;
+    return `${this.PREFIXES.OVERPASS_NOMINATIM}${category}:${minLat.toFixed(2)},${minLon.toFixed(2)},${maxLat.toFixed(2)},${maxLon.toFixed(2)}`;
+  }
+
+  /**
+   * Vérifier si une zone est déjà en cache avec une marge
+   */
+  async hasNearbyCache(lat: number, lon: number, radius: number, marginKm: number = 0.5): Promise<string | null> {
+    // Vérifier les clés proches (avec une marge)
+    const nearbyKeys: string[] = [];
+    const steps = [-1, 0, 1];
+    
+    for (const latStep of steps) {
+      for (const lonStep of steps) {
+        const checkLat = lat + (latStep * 0.01); // ~1km
+        const checkLon = lon + (lonStep * 0.01);
+        const key = this.generateOverpassAreaKey(checkLat, checkLon, radius);
+        nearbyKeys.push(key);
+      }
+    }
+    
+    for (const key of nearbyKeys) {
+      const cached = await this.get(key);
+      if (cached) {
+        this.logger.debug(`Found nearby cache: ${key}`);
+        return key;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Cache intelligent avec vérification de fraîcheur
+   */
+  async getOrSetWithFreshness<T>(
+    key: string,
+    factory: () => Promise<T>,
+    options?: CacheOptions & { 
+      maxAge?: number; // Age maximum acceptable en secondes
+      fallbackOnError?: boolean; // Utiliser le cache expiré si erreur
+    }
+  ): Promise<T> {
+    try {
+      // Essayer de récupérer du cache
+      const cached = await this.get<T>(key);
+      if (cached !== undefined) {
+        return cached;
+      }
+
+      // Si pas en cache, calculer la valeur
+      const value = await factory();
+      
+      // Mettre en cache pour la prochaine fois
+      await this.set(key, value, options);
+      
+      return value;
+    } catch (error) {
+      // Si fallback activé et qu'on a une valeur en cache (même expirée)
+      if (options?.fallbackOnError) {
+        const cached = await this.get<T>(key);
+        if (cached !== undefined) {
+          this.logger.warn(`Using stale cache for ${key} due to error`);
+          return cached;
+        }
+      }
+      throw error;
+    }
   }
 }

@@ -20,6 +20,7 @@ import { PointsService } from './points.service';
 import { CreatePointOfInterestDto } from './dto/create-point.dto';
 import { UpdatePointOfInterestDto } from './dto/update-point.dto';
 import { SearchPointsDto } from './dto/search-points.dto';
+import { SearchHybridDto } from './dto/search-hybrid.dto';
 import { ImportGooglePlacesDto } from './dto/import-google-places.dto';
 import { CreatePointWithPhotosDto } from './dto/create-point-with-photos.dto';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
@@ -122,6 +123,32 @@ export class PointsController {
   @ApiResponse({ status: 200, description: 'Point deleted successfully' })
   remove(@Param('id') id: string, @Request() req) {
     return this.pointsService.remove(id, req.user.id);
+  }
+
+  @Get('search/app')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'App search: returns MongoDB data for all users, adds Google Places for premium users' 
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Search results with source information',
+  })
+  async searchForApp(@Query() searchDto: SearchHybridDto, @Request() req) {
+    // Vérifier si l'utilisateur est premium (à implémenter selon votre logique)
+    const isPremium = req.user?.isPremium || false;
+    
+    // Si l'utilisateur est premium ET a choisi Google Places
+    if (isPremium && searchDto.useGooglePlaces) {
+      return this.pointsService.searchHybrid({
+        ...searchDto,
+        includeGooglePlaces: true
+      });
+    }
+    
+    // Sinon, retourner uniquement les données MongoDB
+    return this.pointsService.findAll(searchDto);
   }
 
   @Get('search/hybrid')

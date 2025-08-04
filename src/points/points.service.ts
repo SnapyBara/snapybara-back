@@ -18,6 +18,7 @@ import { GooglePlacesService } from '../google-places/google-places.service';
 import { PhotosService } from '../photos/photos.service';
 import { UploadService } from '../upload/upload.service';
 import { Photo } from '../photos/schemas/photo.schema';
+import { OverpassService } from '../overpass/overpass.service';
 import * as sharp from 'sharp';
 
 @Injectable()
@@ -30,6 +31,7 @@ export class PointsService {
     private googlePlacesService: GooglePlacesService,
     private photosService: PhotosService,
     private uploadService: UploadService,
+    private overpassService: OverpassService,
   ) {}
 
   /**
@@ -580,18 +582,18 @@ export class PointsService {
   }
 
   /**
-   * Recherche hybride : MongoDB d'abord, puis Google Places pour combler les manques
+   * Recherche hybride : MongoDB d'abord, puis OpenStreetMap/Overpass pour combler les manques
    */
   async searchHybrid(searchDto: SearchPointsDto): Promise<{
     data: PointOfInterest[];
     total: number;
     page: number;
     limit: number;
-    sources: { mongodb: number; googlePlaces: number };
+    sources: { mongodb: number; openstreetmap: number };
   }> {
     const { page = 1, limit = 20 } = searchDto;
     
-    // Limiter à 50 points maximum pour économiser les requêtes
+    // Limiter à 50 points maximum pour économiser les ressources
     const effectiveLimit = Math.min(limit, 50);
     
     // 1. Chercher d'abord dans MongoDB (priorité)
@@ -601,68 +603,187 @@ export class PointsService {
     });
     
     let finalResults = [...mongoResults.data];
-    let googlePlacesCount = 0;
+    let osmCount = 0;
     
-    // 2. Si pas assez de résultats, compléter avec Google Places
+    // 2. Si pas assez de résultats et qu'on a des coordonnées, compléter avec OSM
     const remainingSlots = effectiveLimit - mongoResults.data.length;
     
-    if (remainingSlots > 0 && searchDto.latitude && searchDto.longitude) {
-      this.logger.debug(`MongoDB returned ${mongoResults.data.length} results, fetching ${remainingSlots} more from Google Places`);
+    if (remainingSlots > 0 && searchDto.latitude && searchDto.longitude && searchDto.includeGooglePlaces) {
+      this.logger.debug(`MongoDB returned ${mongoResults.data.length} results, fetching ${remainingSlots} more from OSM`);
       
       try {
-        const googleResults = await this.searchGooglePlaces(searchDto, remainingSlots * 2); // Récupérer plus pour pouvoir filtrer
+        // Utiliser le service Overpass pour récupérer des POIs OSM
+        const osmResults = await this.overpassService.searchPOIs(
+          searchDto.latitude,
+          searchDto.longitude,
+          searchDto.radius || 3, // Rayon en km
+          searchDto.categories?.map(cat => cat.toLowerCase()),
+        );
         
-        // Filtrer les résultats Google Places qui existent déjà dans MongoDB
-        const filteredGoogleResults = await this.filterExistingPlaces(googleResults);
+        // Filtrer les résultats OSM qui existent déjà
+        const filteredOSMResults = await this.filterExistingPlaces(osmResults);
         
-        // Convertir et filtrer les résultats Google Places par catégorie si nécessaire
-        for (const googlePlace of filteredGoogleResults) {
+        // Convertir les résultats OSM en format PointOfInterest
+        for (const osmPOI of filteredOSMResults) {
           if (finalResults.length >= effectiveLimit) break;
           
-          const convertedPlace = this.googlePlacesService.convertToPointOfInterest(googlePlace);
+          // Mapper le type OSM vers nos catégories
+          const category = this.mapOSMTypeToCategory(osmPOI.type);
           
           // Filtrer par catégorie si spécifiée
           if (searchDto.categories && searchDto.categories.length > 0) {
-            // Convertir les catégories en minuscules pour la comparaison
             const categoriesAsStrings = this.categoriesToStrings(searchDto.categories);
-            if (!categoriesAsStrings?.includes(convertedPlace.category.toLowerCase())) {
-              continue; // Passer au suivant si la catégorie ne correspond pas
+            if (!categoriesAsStrings?.includes(category)) {
+              continue;
             }
           }
           
-          // Créer un objet temporaire qui ressemble à un PointOfInterest pour la réponse
-          finalResults.push({
-            ...convertedPlace,
-            id: new Types.ObjectId().toString(), // ID temporaire
+          // Créer un objet temporaire qui ressemble à un PointOfInterest
+          const poiData = {
+            _id: new Types.ObjectId(),
+            id: new Types.ObjectId().toString(),
+            name: osmPOI.name,
+            description: this.generateDescription(osmPOI),
+            latitude: osmPOI.lat,
+            longitude: osmPOI.lon,
             location: {
               type: 'Point',
-              coordinates: [convertedPlace.longitude, convertedPlace.latitude],
+              coordinates: [osmPOI.lon, osmPOI.lat],
             },
-            userId: null, // Pas d'utilisateur pour les résultats Google Places
+            category,
+            address: {
+              formattedAddress: osmPOI.tags['addr:full'] || 
+                    `${osmPOI.tags['addr:street'] || ''} ${osmPOI.tags['addr:housenumber'] || ''}`.trim() ||
+                    osmPOI.tags['addr:city'] || null,
+              street: osmPOI.tags['addr:street'] || null,
+              city: osmPOI.tags['addr:city'] || null,
+              postalCode: osmPOI.tags['addr:postcode'] || null,
+              country: osmPOI.tags['addr:country'] || null
+            },
+            photos: [],
+            tags: this.extractTags(osmPOI),
+            statistics: {
+              averageRating: 0,
+              totalReviews: 0,
+              totalPhotos: 0,
+              totalLikes: 0,
+            },
+            metadata: {
+              source: 'openstreetmap',
+              osmId: osmPOI.id,
+              osmType: osmPOI.type,
+              osmTags: osmPOI.tags,
+              lastSync: new Date(),
+              imageUrl: osmPOI.tags['image_url'],
+              wikipedia: osmPOI.tags['wikipedia'],
+              wikidata: osmPOI.tags['wikidata'],
+              website: osmPOI.tags['website'],
+              openingHours: osmPOI.tags['opening_hours'],
+            },
+            userId: null,
             isPublic: true,
             isActive: true,
             status: 'approved',
             viewCount: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
-          } as any);
-          googlePlacesCount++;
+          } as any;
+          
+          finalResults.push(poiData);
+          osmCount++;
         }
+        
+        this.logger.debug(`Added ${osmCount} POIs from OpenStreetMap`);
       } catch (error) {
-        this.logger.error('Error fetching Google Places results:', error);
+        this.logger.error('Error fetching OSM results:', error);
       }
     }
     
     return {
-      data: finalResults.slice(0, effectiveLimit), // S'assurer qu'on ne dépasse pas la limite
-      total: mongoResults.total + googlePlacesCount,
+      data: finalResults.slice(0, effectiveLimit),
+      total: mongoResults.total + osmCount,
       page,
       limit: effectiveLimit,
       sources: {
         mongodb: mongoResults.data.length,
-        googlePlaces: googlePlacesCount,
+        openstreetmap: osmCount,
       },
     };
+  }
+
+  /**
+   * Mapper les types OSM vers nos catégories
+   */
+  private mapOSMTypeToCategory(osmType: string): string {
+    const mapping: Record<string, string> = {
+      viewpoint: 'landscape',
+      museum: 'historical',
+      monument: 'historical',
+      memorial: 'historical',
+      castle: 'historical',
+      ruins: 'historical',
+      cathedral: 'architecture',
+      church: 'architecture',
+      chapel: 'architecture',
+      religious: 'architecture',
+      artwork: 'street_art',
+      statue: 'street_art',
+      fountain: 'architecture',
+      bridge: 'architecture',
+      tower: 'architecture',
+      waterfall: 'landscape',
+      cliff: 'landscape',
+      peak: 'mountain',
+      lake: 'landscape',
+      beach: 'landscape',
+      garden: 'forest',
+      park: 'forest',
+      square: 'architecture',
+      attraction: 'landscape',
+    };
+    
+    return mapping[osmType] || 'other';
+  }
+
+  /**
+   * Générer une description depuis les tags OSM
+   */
+  private generateDescription(osmPOI: any): string {
+    const parts: string[] = [];
+    
+    if (osmPOI.tags['description']) {
+      parts.push(osmPOI.tags['description']);
+    }
+    
+    if (osmPOI.tags['tourism']) {
+      parts.push(`Type: ${osmPOI.tags['tourism']}`);
+    }
+    
+    if (osmPOI.tags['historic']) {
+      parts.push(`Historic: ${osmPOI.tags['historic']}`);
+    }
+    
+    if (osmPOI.tags['heritage']) {
+      parts.push('Site classé au patrimoine');
+    }
+    
+    return parts.join('. ') || `${osmPOI.type} - ${osmPOI.name}`;
+  }
+
+  /**
+   * Extraire des tags pertinents depuis OSM
+   */
+  private extractTags(osmPOI: any): string[] {
+    const tags: string[] = [];
+    
+    if (osmPOI.type) tags.push(osmPOI.type);
+    if (osmPOI.tags['tourism']) tags.push(osmPOI.tags['tourism']);
+    if (osmPOI.tags['historic']) tags.push(osmPOI.tags['historic']);
+    if (osmPOI.tags['amenity']) tags.push(osmPOI.tags['amenity']);
+    if (osmPOI.tags['heritage']) tags.push('patrimoine');
+    if (osmPOI.tags['wikipedia']) tags.push('wikipedia');
+    
+    return [...new Set(tags)]; // Dédupliquer
   }
 
   /**
@@ -752,41 +873,44 @@ export class PointsService {
   }
 
   /**
-   * Filtrer les lieux Google Places qui existent déjà dans MongoDB
+   * Filtrer les lieux OSM qui existent déjà dans MongoDB
    */
-  private async filterExistingPlaces(googlePlaces: any[]): Promise<any[]> {
-    if (googlePlaces.length === 0) return [];
+  private async filterExistingPlaces(osmResults: any): Promise<any[]> {
+    if (!osmResults || !osmResults.data || osmResults.data.length === 0) return [];
 
-    // Rechercher dans MongoDB par googlePlaceId dans les métadonnées
-    const googlePlaceIds = googlePlaces.map(place => place.place_id);
+    const osmPOIs = osmResults.data;
+    
+    // Rechercher dans MongoDB par osmId dans les métadonnées
+    const osmIds = osmPOIs.map(poi => poi.id);
     
     const existingPlaces = await this.pointModel
       .find({
-        'metadata.googlePlaceId': { $in: googlePlaceIds }
+        'metadata.osmId': { $in: osmIds }
       })
-      .select('metadata.googlePlaceId')
+      .select('metadata.osmId')
       .exec();
 
-    const existingGooglePlaceIds = new Set(
-      existingPlaces.map(place => place.metadata?.googlePlaceId)
+    const existingOsmIds = new Set(
+      existingPlaces.map(place => place.metadata?.osmId)
     );
 
     // Filtrer aussi par proximité géographique pour éviter les doublons
     const filtered: any[] = [];
     
-    for (const googlePlace of googlePlaces) {
-      // Skip si déjà existant par Google Place ID
-      if (existingGooglePlaceIds.has(googlePlace.place_id)) {
+    for (const poi of osmPOIs) {
+      // Skip si déjà existant par OSM ID
+      if (existingOsmIds.has(poi.id)) {
         continue;
       }
 
       // Vérifier la proximité géographique (éviter les doublons à moins de 100m)
+      // Utiliser une requête aggregate au lieu de $near dans un $or
       const nearbyExisting = await this.pointModel.aggregate([
         {
           $geoNear: {
             near: {
               type: 'Point',
-              coordinates: [googlePlace.geometry.location.lng, googlePlace.geometry.location.lat],
+              coordinates: [poi.lon, poi.lat],
             },
             distanceField: 'distance',
             maxDistance: 100, // 100 mètres
@@ -798,7 +922,7 @@ export class PointsService {
       ]);
 
       if (nearbyExisting.length === 0) {
-        filtered.push(googlePlace);
+        filtered.push(poi);
       }
     }
 

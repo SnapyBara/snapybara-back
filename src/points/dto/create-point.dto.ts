@@ -1,16 +1,5 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsNumber,
-  IsBoolean,
-  IsOptional,
-  IsEnum,
-  IsArray,
-  IsObject,
-  Min,
-  Max,
-  Length,
-} from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsObject, IsArray, IsBoolean, IsEnum, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum POICategory {
@@ -26,66 +15,144 @@ export enum POICategory {
   URBAN = 'urban',
   HISTORICAL = 'historical',
   RELIGIOUS = 'religious',
-  OTHER = 'other',
+  OTHER = 'other'
 }
 
-export class CreatePointOfInterestDto {
+class AddressDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  formattedAddress?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  street?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
+}
+
+class MetadataDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  googlePlaceId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  source?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsArray()
+  photos?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  website?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsArray()
+  googleTypes?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  businessStatus?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  priceLevel?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  osmId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  osmTags?: Record<string, string>;
+}
+
+export class CreatePointDto {
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  @Length(3, 100)
   name: string;
 
   @ApiPropertyOptional()
-  @IsString()
   @IsOptional()
-  @Length(0, 1000)
+  @IsString()
   description?: string;
 
   @ApiProperty()
   @IsNumber()
-  @IsNotEmpty()
-  @Min(-90)
-  @Max(90)
   latitude: number;
 
   @ApiProperty()
   @IsNumber()
-  @IsNotEmpty()
-  @Min(-180)
-  @Max(180)
   longitude: number;
 
-  @ApiProperty({ enum: POICategory })
-  @IsEnum(POICategory)
-  @IsNotEmpty()
-  category: POICategory;
+  @ApiProperty()
+  @IsString()
+  category: string;
 
-  @ApiPropertyOptional({ default: true })
-  @IsBoolean()
+  @ApiPropertyOptional()
   @IsOptional()
+  @ValidateNested()
+  @Type(() => AddressDto)
+  address?: AddressDto;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MetadataDto)
+  metadata?: MetadataDto;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
   isPublic?: boolean;
 
   @ApiPropertyOptional()
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @IsOptional()
   tags?: string[];
 
   @ApiPropertyOptional()
-  @IsObject()
   @IsOptional()
-  address?: {
-    street?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    postalCode?: string;
-    formattedAddress?: string;
-  };
-
-  @ApiPropertyOptional()
-  @IsObject()
-  @IsOptional()
-  metadata?: Record<string, any>;
+  @IsArray()
+  @IsString({ each: true })
+  photos?: string[];
 }
+
+// Alias pour la compatibilité avec l'ancien nom
+export class CreatePointOfInterestDto extends CreatePointDto {}
