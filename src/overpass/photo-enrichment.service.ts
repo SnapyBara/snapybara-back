@@ -220,8 +220,8 @@ export class PhotoEnrichmentService {
       this.logger.log(`Found ${pages.length} pages in Wikimedia response`);
 
       for (const page of pages) {
-        if (page.imageinfo?.[0]) {
-          const info = page.imageinfo[0];
+        if ((page as any).imageinfo?.[0]) {
+          const info = (page as any).imageinfo[0];
           photos.push({
             url: info.thumburl || info.url,
             source: 'wikimedia',
