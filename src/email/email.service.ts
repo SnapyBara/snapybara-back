@@ -84,12 +84,10 @@ export class EmailService {
 
   async confirmEmailWithSupabase(tokenHash: string): Promise<boolean> {
     try {
-      const { error } = await this.supabaseService
-        .getClient()
-        .auth.verifyOtp({
-          token_hash: tokenHash,
-          type: 'email',
-        });
+      const { error } = await this.supabaseService.getClient().auth.verifyOtp({
+        token_hash: tokenHash,
+        type: 'email',
+      });
 
       if (error) {
         console.error('Erreur lors de la confirmation Supabase:', error);

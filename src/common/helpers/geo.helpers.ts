@@ -111,7 +111,7 @@ export function calculateCenterPoint(locations: Location[]): Location {
   let totalLat = 0;
   let totalLon = 0;
 
-  locations.forEach(location => {
+  locations.forEach((location) => {
     totalLat += location.latitude;
     totalLon += location.longitude;
   });
@@ -213,7 +213,7 @@ export function findNearestPoints<
   points: T[],
   limit: number = 10,
 ): Array<T & { distance: number }> {
-  const pointsWithDistance = points.map(point => ({
+  const pointsWithDistance = points.map((point) => ({
     ...point,
     distance: calculateDistance(
       userLocation.latitude,

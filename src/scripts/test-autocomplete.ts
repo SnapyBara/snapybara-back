@@ -72,7 +72,10 @@ async function testAutocomplete() {
   } as ConfigService;
 
   const mockCacheService = new MockCacheService() as any;
-  const googlePlacesService = new GooglePlacesService(configService, mockCacheService);
+  const googlePlacesService = new GooglePlacesService(
+    configService,
+    mockCacheService,
+  );
 
   console.log('🔍 Testing Google Places Autocomplete...\n');
 

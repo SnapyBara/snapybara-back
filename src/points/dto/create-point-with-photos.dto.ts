@@ -187,7 +187,8 @@ export class CreatePointWithPhotosDto {
 
   @ApiPropertyOptional({
     description: 'Detailed description of the location',
-    example: 'Perfect spot for sunrise photos with clear view of the Eiffel Tower from Trocadéro Gardens',
+    example:
+      'Perfect spot for sunrise photos with clear view of the Eiffel Tower from Trocadéro Gardens',
     maxLength: 1000,
   })
   @IsString()
@@ -269,7 +270,8 @@ export class CreatePointWithPhotosDto {
 
   @ApiPropertyOptional({
     description: 'Accessibility information',
-    example: 'Wheelchair accessible. Public transport: Metro Line 6/9 Trocadéro station',
+    example:
+      'Wheelchair accessible. Public transport: Metro Line 6/9 Trocadéro station',
   })
   @IsString()
   @IsOptional()
@@ -278,7 +280,8 @@ export class CreatePointWithPhotosDto {
 
   @ApiPropertyOptional({
     description: 'Photography tips for this location',
-    example: 'Use wide-angle lens for full tower view. Tripod recommended for sunrise shots.',
+    example:
+      'Use wide-angle lens for full tower view. Tripod recommended for sunrise shots.',
   })
   @IsString()
   @IsOptional()

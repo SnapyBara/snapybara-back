@@ -21,26 +21,39 @@ export interface EnrichedPOI extends OverpassPOI {
 export class PhotoEnrichmentService {
   private readonly logger = new Logger(PhotoEnrichmentService.name);
   private readonly unsplashAccessKey: string;
-  
+
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.unsplashAccessKey = this.configService.get<string>('UNSPLASH_ACCESS_KEY', '');
+    this.unsplashAccessKey = this.configService.get<string>(
+      'UNSPLASH_ACCESS_KEY',
+      '',
+    );
   }
 
   /**
    * Enrichit un POI avec des photos depuis Wikimedia et Unsplash
    */
   async enrichPOIWithPhotos(poi: OverpassPOI): Promise<EnrichedPOI> {
+    this.logger.log(`=== ENRICHING POI WITH PHOTOS ===`);
+    this.logger.log(`POI ID: ${poi.id}`);
+    this.logger.log(`POI Name: ${poi.name}`);
+    this.logger.log(`POI Type: ${poi.type}`);
+    this.logger.log(`Coordinates: ${poi.lat}, ${poi.lon}`);
+    this.logger.log(`Tags:`, poi.tags);
+
     const enrichedPOI: EnrichedPOI = {
       ...poi,
       photos: [],
       photoSearchTerms: this.generateSearchTerms(poi),
     };
 
+    this.logger.log(`Search terms generated: ${enrichedPOI.photoSearchTerms}`);
+
     try {
       // 1. D'abord essayer Wikimedia Commons
+      this.logger.log('Trying Wikimedia Commons...');
       const wikimediaPhotos = await this.getWikimediaPhotos(
         poi.lat,
         poi.lon,
@@ -50,12 +63,20 @@ export class PhotoEnrichmentService {
 
       if (wikimediaPhotos.length > 0) {
         enrichedPOI.photos = wikimediaPhotos;
-        this.logger.debug(`Found ${wikimediaPhotos.length} Wikimedia photos for ${poi.name}`);
+        this.logger.log(
+          `✅ Found ${wikimediaPhotos.length} Wikimedia photos for ${poi.name}`,
+        );
+        this.logger.log(
+          `Photos URLs: ${wikimediaPhotos.map((p) => p.url).join(', ')}`,
+        );
         return enrichedPOI;
       }
 
+      this.logger.log('❌ No Wikimedia photos found');
+
       // 2. Si pas de photos Wikimedia et Unsplash configuré, essayer Unsplash
       if (this.unsplashAccessKey && this.unsplashAccessKey !== '') {
+        this.logger.log('Trying Unsplash...');
         const unsplashPhotos = await this.getUnsplashPhotos(
           poi.name,
           poi.type,
@@ -65,19 +86,37 @@ export class PhotoEnrichmentService {
 
         if (unsplashPhotos.length > 0) {
           enrichedPOI.photos = unsplashPhotos;
-          this.logger.debug(`Found ${unsplashPhotos.length} Unsplash photos for ${poi.name}`);
+          this.logger.log(
+            `✅ Found ${unsplashPhotos.length} Unsplash photos for ${poi.name}`,
+          );
+          this.logger.log(
+            `Photos URLs: ${unsplashPhotos.map((p) => p.url).join(', ')}`,
+          );
           return enrichedPOI;
         }
+
+        this.logger.log('❌ No Unsplash photos found');
+      } else {
+        this.logger.log('⚠️ Unsplash API key not configured');
       }
 
       // 3. Si toujours pas de photos, utiliser des placeholders
+      this.logger.log('Using placeholder photos');
       enrichedPOI.photos = this.getPlaceholderPhotos(poi.name, poi.type);
-      this.logger.debug(`Using placeholder photos for ${poi.name}`);
-
+      this.logger.log(
+        `📷 Using ${enrichedPOI.photos.length} placeholder photos for ${poi.name}`,
+      );
     } catch (error) {
-      this.logger.error(`Error enriching POI with photos: ${poi.name}`, error);
+      this.logger.error(
+        `❌ Error enriching POI with photos: ${poi.name}`,
+        error,
+      );
       enrichedPOI.photos = this.getPlaceholderPhotos(poi.name, poi.type);
     }
+
+    this.logger.log(
+      `=== END ENRICHMENT - Total photos: ${enrichedPOI.photos.length} ===`,
+    );
 
     return enrichedPOI;
   }
@@ -93,13 +132,13 @@ export class PhotoEnrichmentService {
     for (let i = 0; i < pois.length; i += batchSize) {
       const batch = pois.slice(i, i + batchSize);
       const enrichedBatch = await Promise.all(
-        batch.map(poi => this.enrichPOIWithPhotos(poi))
+        batch.map((poi) => this.enrichPOIWithPhotos(poi)),
       );
       enrichedPOIs.push(...enrichedBatch);
-      
+
       // Petit délai entre les batches pour respecter les rate limits
       if (i + batchSize < pois.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
 
@@ -116,34 +155,52 @@ export class PhotoEnrichmentService {
     tags: Record<string, string>,
   ): Promise<POIPhoto[]> {
     try {
+      this.logger.log(`🔍 Searching Wikimedia photos for: ${name}`);
+
       // 1. Si on a un tag wikimedia_commons direct
       if (tags.wikimedia_commons) {
-        const imageUrl = await this.getWikimediaImageUrl(tags.wikimedia_commons);
+        this.logger.log(
+          `Found wikimedia_commons tag: ${tags.wikimedia_commons}`,
+        );
+        const imageUrl = await this.getWikimediaImageUrl(
+          tags.wikimedia_commons,
+        );
         if (imageUrl) {
-          return [{
-            url: imageUrl,
-            source: 'wikimedia',
-            attribution: 'Wikimedia Commons',
-          }];
+          return [
+            {
+              url: imageUrl,
+              source: 'wikimedia',
+              attribution: 'Wikimedia Commons',
+            },
+          ];
         }
       }
 
       // 2. Si on a un tag image direct
       if (tags.image) {
-        return [{
-          url: tags.image,
-          source: 'wikimedia',
-          attribution: 'OpenStreetMap',
-        }];
+        this.logger.log(`Found image tag: ${tags.image}`);
+        return [
+          {
+            url: tags.image,
+            source: 'wikimedia',
+            attribution: 'OpenStreetMap',
+          },
+        ];
       }
 
       // 3. Recherche par géolocalisation
       const radius = 500; // 500m de rayon
-      const url = `https://commons.wikimedia.org/w/api.php?` +
+      const url =
+        `https://commons.wikimedia.org/w/api.php?` +
         `action=query&format=json&` +
         `generator=geosearch&ggsprimary=all&ggsnamespace=6&` +
         `ggsradius=${radius}&ggscoord=${lat}|${lon}&ggslimit=5&` +
         `prop=imageinfo&iiprop=url|size|extmetadata&iiurlwidth=800`;
+
+      this.logger.log(
+        `Searching by geolocation: ${lat}, ${lon} with radius ${radius}m`,
+      );
+      this.logger.log(`API URL: ${url}`);
 
       const response = await firstValueFrom(
         this.httpService.get(url, {
@@ -154,11 +211,13 @@ export class PhotoEnrichmentService {
       );
 
       if (!response.data.query?.pages) {
+        this.logger.log('No pages in Wikimedia response');
         return [];
       }
 
       const photos: POIPhoto[] = [];
-      const pages = Object.values(response.data.query.pages) as any[];
+      const pages = Object.values(response.data.query.pages);
+      this.logger.log(`Found ${pages.length} pages in Wikimedia response`);
 
       for (const page of pages) {
         if (page.imageinfo?.[0]) {
@@ -173,10 +232,11 @@ export class PhotoEnrichmentService {
         }
       }
 
-      return photos.slice(0, 3); // Limiter à 3 photos
+      this.logger.log(`Found ${photos.length} photos from Wikimedia`);
 
+      return photos.slice(0, 3); // Limiter à 3 photos
     } catch (error) {
-      this.logger.error('Error fetching Wikimedia photos:', error);
+      this.logger.error('Error fetching Wikimedia photos:', error.message);
       return [];
     }
   }
@@ -197,8 +257,9 @@ export class PhotoEnrichmentService {
     try {
       // Construire la requête de recherche
       const query = this.buildUnsplashQuery(name, type, tags, searchTerms);
-      
-      const url = `https://api.unsplash.com/search/photos?` +
+
+      const url =
+        `https://api.unsplash.com/search/photos?` +
         `query=${encodeURIComponent(query)}&` +
         `per_page=3&` +
         `orientation=landscape`;
@@ -206,7 +267,7 @@ export class PhotoEnrichmentService {
       const response = await firstValueFrom(
         this.httpService.get(url, {
           headers: {
-            'Authorization': `Client-ID ${this.unsplashAccessKey}`,
+            Authorization: `Client-ID ${this.unsplashAccessKey}`,
             'Accept-Version': 'v1',
           },
         }),
@@ -223,7 +284,6 @@ export class PhotoEnrichmentService {
         width: photo.width,
         height: photo.height,
       }));
-
     } catch (error) {
       this.logger.error('Error fetching Unsplash photos:', error);
       return [];
@@ -346,14 +406,13 @@ export class PhotoEnrichmentService {
         .replace(/ /g, '_');
 
       // Utiliser l'API pour obtenir l'URL
-      const url = `https://commons.wikimedia.org/w/api.php?` +
+      const url =
+        `https://commons.wikimedia.org/w/api.php?` +
         `action=query&format=json&` +
         `titles=File:${encodeURIComponent(cleanFilename)}&` +
         `prop=imageinfo&iiprop=url|size&iiurlwidth=800`;
 
-      const response = await firstValueFrom(
-        this.httpService.get(url),
-      );
+      const response = await firstValueFrom(this.httpService.get(url));
 
       const pages = response.data.query.pages;
       const page = Object.values(pages)[0] as any;
@@ -374,8 +433,10 @@ export class PhotoEnrichmentService {
    */
   private getPlaceholderPhotos(name: string, type: string): POIPhoto[] {
     // Utiliser Lorem Picsum avec un seed basé sur le nom
-    const seed = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    
+    const seed = name
+      .split('')
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
     const categoryMap: Record<string, string> = {
       viewpoint: '1015', // Nature
       landscape: '1015',

@@ -1,4 +1,13 @@
-import { IsString, IsNumber, IsOptional, IsObject, IsArray, IsBoolean, IsEnum, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsObject,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -15,7 +24,7 @@ export enum POICategory {
   URBAN = 'urban',
   HISTORICAL = 'historical',
   RELIGIOUS = 'religious',
-  OTHER = 'other'
+  OTHER = 'other',
 }
 
 class AddressDto {

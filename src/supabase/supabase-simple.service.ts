@@ -10,7 +10,9 @@ export class SupabaseSimpleService {
   constructor(private configService: ConfigService) {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
     const supabaseAnonKey = this.configService.get<string>('SUPABASE_ANON_KEY');
-    const supabaseServiceKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseServiceKey = this.configService.get<string>(
+      'SUPABASE_SERVICE_ROLE_KEY',
+    );
 
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Supabase configuration is missing');

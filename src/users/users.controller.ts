@@ -13,7 +13,12 @@ import {
   HttpException,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -133,13 +138,24 @@ export class UsersController {
     try {
       // Check if username is unique (if provided)
       if (updateProfileDto.username) {
-        const existingUser = await this.usersService.findByUsername(updateProfileDto.username);
-        if (existingUser && existingUser._id?.toString() !== currentUser.mongoId) {
-          throw new HttpException('Username already taken', HttpStatus.CONFLICT);
+        const existingUser = await this.usersService.findByUsername(
+          updateProfileDto.username,
+        );
+        if (
+          existingUser &&
+          existingUser._id?.toString() !== currentUser.mongoId
+        ) {
+          throw new HttpException(
+            'Username already taken',
+            HttpStatus.CONFLICT,
+          );
         }
       }
 
-      const user = await this.usersService.update(currentUser.mongoId, updateProfileDto);
+      const user = await this.usersService.update(
+        currentUser.mongoId,
+        updateProfileDto,
+      );
       return plainToClass(UserResponseDto, user.toObject(), {
         excludeExtraneousValues: true,
       });
@@ -147,7 +163,10 @@ export class UsersController {
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new HttpException('Failed to update profile', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Failed to update profile',
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 
@@ -208,7 +227,10 @@ export class UsersController {
         message: 'User account successfully deleted',
       };
     } catch (error) {
-      throw new HttpException('Failed to delete account', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Failed to delete account',
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 
@@ -228,7 +250,10 @@ export class UsersController {
         message: 'User account successfully deleted',
       };
     } catch (error) {
-      throw new HttpException('Failed to delete account', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Failed to delete account',
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 

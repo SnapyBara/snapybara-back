@@ -8,11 +8,9 @@ import { AuthModule } from './auth/auth.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { validateEnvironment } from './config/env.validation';
 import { EmailModule } from './email/email.module';
-import { ProtectedModule } from './protected/protected.module';
 import { HealthModule } from './health/health.module';
 import { UsersModule } from './users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
-import { MongoDBTestController } from './mongodb-test.controller';
 import { DatabaseConfig } from './config/database.config';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
@@ -62,7 +60,6 @@ import { OverpassModule } from './overpass/overpass.module';
     AuthModule,
     UsersModule,
     WebhooksModule,
-    ProtectedModule,
     HealthModule,
     EmailModule,
     PointsModule,
@@ -77,7 +74,7 @@ import { OverpassModule } from './overpass/overpass.module';
     GooglePlacesModule,
     OverpassModule,
   ],
-  controllers: [MongoDBTestController],
+  controllers: [],
   providers: [
     DatabaseConfig,
     {

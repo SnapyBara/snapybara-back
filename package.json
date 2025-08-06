@@ -23,7 +23,8 @@
     "test:db-simple": "ts-node -r tsconfig-paths/register src/test-db-simple.ts",
     "test:google-places": "ts-node -r tsconfig-paths/register src/google-places/test-google-places.ts",
     "script:import-landmarks": "ts-node -r tsconfig-paths/register src/scripts/import-natural-landmarks.ts",
-    "script:test-search": "ts-node -r tsconfig-paths/register src/scripts/test-search.ts"
+    "script:test-search": "ts-node -r tsconfig-paths/register src/scripts/test-search.ts",
+    "script:clear-queue": "ts-node -r tsconfig-paths/register src/scripts/clear-overpass-queue.ts"
   },
   "dependencies": {
     "@apollo/server": "^4.12.2",
@@ -34,6 +35,7 @@
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
+    "@nestjs/event-emitter": "^3.0.1",
     "@nestjs/graphql": "^13.1.0",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/mongoose": "^11.0.3",

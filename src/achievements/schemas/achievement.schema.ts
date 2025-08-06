@@ -108,7 +108,8 @@ export class UserAchievement {
   metadata?: Record<string, any>;
 }
 
-export const UserAchievementSchema = SchemaFactory.createForClass(UserAchievement);
+export const UserAchievementSchema =
+  SchemaFactory.createForClass(UserAchievement);
 
 // Indexes
 AchievementSchema.index({ code: 1 });

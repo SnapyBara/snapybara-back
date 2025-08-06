@@ -15,6 +15,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { PointsService } from './points.service';
 import { CreatePointOfInterestDto } from './dto/create-point.dto';
@@ -128,8 +129,9 @@ export class PointsController {
   @Get('search/app')
   @UseGuards(SupabaseAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
-    summary: 'App search: returns MongoDB data for all users, adds Google Places for premium users' 
+  @ApiOperation({
+    summary:
+      'App search: returns MongoDB data for all users, adds Google Places for premium users',
   })
   @ApiResponse({
     status: 200,
@@ -138,15 +140,15 @@ export class PointsController {
   async searchForApp(@Query() searchDto: SearchHybridDto, @Request() req) {
     // Vérifier si l'utilisateur est premium (à implémenter selon votre logique)
     const isPremium = req.user?.isPremium || false;
-    
+
     // Si l'utilisateur est premium ET a choisi Google Places
     if (isPremium && searchDto.useGooglePlaces) {
       return this.pointsService.searchHybrid({
         ...searchDto,
-        includeGooglePlaces: true
+        includeGooglePlaces: true,
       });
     }
-    
+
     // Sinon, retourner uniquement les données MongoDB
     return this.pointsService.findAll(searchDto);
   }
@@ -175,6 +177,37 @@ export class PointsController {
   })
   searchHybrid(@Query() searchDto: SearchPointsDto) {
     return this.pointsService.searchHybrid(searchDto);
+  }
+
+  @Post('enrich-photos')
+  @ApiOperation({ summary: 'Enrich multiple POIs with photos' })
+  @ApiQuery({
+    name: 'osmIds',
+    type: [String],
+    description: 'OSM IDs to enrich',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'POIs enriched with photos',
+    schema: {
+      type: 'object',
+      additionalProperties: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            url: { type: 'string' },
+            source: { type: 'string' },
+            attribution: { type: 'string' },
+            width: { type: 'number' },
+            height: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  async enrichPhotos(@Body() body: { pois: any[] }) {
+    return this.pointsService.enrichPOIsWithPhotos(body.pois);
   }
 
   @Get('google-places/:placeId')

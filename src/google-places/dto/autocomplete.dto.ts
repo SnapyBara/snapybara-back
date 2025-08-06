@@ -31,7 +31,8 @@ export class AutocompleteQueryDto {
   longitude?: number;
 
   @ApiProperty({
-    description: 'The distance (in meters) within which to return place results',
+    description:
+      'The distance (in meters) within which to return place results',
     example: 50000,
     required: false,
     minimum: 1,

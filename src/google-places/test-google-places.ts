@@ -78,7 +78,10 @@ async function testGooglePlaces() {
 
   const configService = app.get(ConfigService);
   const mockCacheService = new MockCacheService() as any;
-  const googlePlacesService = new GooglePlacesService(configService, mockCacheService);
+  const googlePlacesService = new GooglePlacesService(
+    configService,
+    mockCacheService,
+  );
 
   // Test 1: Vérifier la configuration
   console.log('\n📋 Test 1: Configuration');

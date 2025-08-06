@@ -12,16 +12,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     const jwtSecret = configService.get<string>('SUPABASE_JWT_SECRET');
     const projectRef = configService.get<string>('SUPABASE_PROJECT_REF');
-    
+
     if (!jwtSecret) {
       throw new Error('SUPABASE_JWT_SECRET is required');
     }
-    
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
-      issuer: projectRef ? `https://${projectRef}.supabase.co/auth/v1` : undefined,
+      issuer: projectRef
+        ? `https://${projectRef}.supabase.co/auth/v1`
+        : undefined,
       audience: projectRef || undefined,
     });
   }
@@ -30,7 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     try {
       // Validate user exists and is active
       const user = await this.authService.validateUserById(payload.sub);
-      
+
       if (!user) {
         throw new UnauthorizedException('User not found');
       }

@@ -16,11 +16,11 @@ export class AuthService {
   ) {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
     const supabaseKey = this.configService.get<string>('SUPABASE_ANON_KEY');
-    
+
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Supabase configuration is missing');
     }
-    
+
     this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
@@ -39,7 +39,7 @@ export class AuthService {
 
       // Get or sync user from MongoDB
       let mongoUser = await this.usersService.findBySupabaseId(user.id);
-      
+
       if (!mongoUser) {
         // If user doesn't exist in MongoDB, sync it
         mongoUser = await this.usersService.syncWithSupabase(user);
@@ -50,7 +50,9 @@ export class AuthService {
         await this.usersService.updateLastLogin(mongoUser._id.toString());
       }
 
-      this.logger.log(`User authenticated: ${mongoUser.username} (${mongoUser.email})`);
+      this.logger.log(
+        `User authenticated: ${mongoUser.username} (${mongoUser.email})`,
+      );
 
       return {
         supabaseId: user.id,
@@ -68,7 +70,7 @@ export class AuthService {
 
   async validateUserById(supabaseId: string): Promise<any> {
     const mongoUser = await this.usersService.findBySupabaseId(supabaseId);
-    
+
     if (!mongoUser || !mongoUser.isActive) {
       throw new UnauthorizedException('User not found or inactive');
     }
