@@ -3,15 +3,14 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { validateEnvironment } from './config/env.validation';
 import { EmailModule } from './email/email.module';
-import { ProtectedModule } from './protected/protected.module';
 import { HealthModule } from './health/health.module';
 import { UsersModule } from './users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
-import { MongoDBTestController } from './mongodb-test.controller';
 import { DatabaseConfig } from './config/database.config';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
@@ -24,6 +23,9 @@ import { StatisticsModule } from './statistics/statistics.module';
 import { SearchModule } from './search/search.module';
 import { UploadModule } from './upload/upload.module';
 import { GraphqlModule } from './graphql/graphql.module';
+import { GooglePlacesModule } from './google-places/google-places.module';
+import { CacheModule } from './cache/cache.module';
+import { OverpassModule } from './overpass/overpass.module';
 
 @Module({
   imports: [
@@ -32,6 +34,8 @@ import { GraphqlModule } from './graphql/graphql.module';
       validate: validateEnvironment,
       envFilePath: ['.env.local', '.env'],
     }),
+    ScheduleModule.forRoot(),
+    CacheModule,
     ThrottlerModule.forRoot([
       {
         ttl: parseInt(process.env.THROTTLE_TTL || '60') * 1000, // Convert to milliseconds
@@ -56,7 +60,6 @@ import { GraphqlModule } from './graphql/graphql.module';
     AuthModule,
     UsersModule,
     WebhooksModule,
-    ProtectedModule,
     HealthModule,
     EmailModule,
     PointsModule,
@@ -68,8 +71,10 @@ import { GraphqlModule } from './graphql/graphql.module';
     SearchModule,
     UploadModule,
     GraphqlModule,
+    GooglePlacesModule,
+    OverpassModule,
   ],
-  controllers: [MongoDBTestController],
+  controllers: [],
   providers: [
     DatabaseConfig,
     {

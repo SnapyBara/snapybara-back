@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
 
@@ -17,10 +22,13 @@ export class SupabaseJwtGuard implements CanActivate {
     try {
       const supabase = createClient(
         this.configService.get<string>('SUPABASE_URL')!,
-        this.configService.get<string>('SUPABASE_ANON_KEY')!
+        this.configService.get<string>('SUPABASE_ANON_KEY')!,
       );
 
-      const { data: { user }, error } = await supabase.auth.getUser(token);
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser(token);
 
       if (error) {
         throw new UnauthorizedException('Invalid token');

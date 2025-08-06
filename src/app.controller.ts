@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Res,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Res, HttpStatus, Query } from '@nestjs/common';
 import { Response } from 'express';
 import { AppService } from './app.service';
 
@@ -166,7 +160,10 @@ export class AppController {
   }
 
   @Get('auth/reset-v2')
-  legacyPasswordResetRedirect(@Query() query: Record<string, string>, @Res() res: Response) {
+  legacyPasswordResetRedirect(
+    @Query() query: Record<string, string>,
+    @Res() res: Response,
+  ) {
     console.log(
       '🔄 Redirection depuis legacy /auth/reset-v2 vers /email/reset-password-form',
     );

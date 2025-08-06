@@ -2,15 +2,15 @@ import { IsEmail, IsString, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateUserDto {
-  @ApiProperty({ description: 'Email de l\'utilisateur' })
+  @ApiProperty({ description: "Email de l'utilisateur" })
   @IsEmail()
   email: string;
 
-  @ApiProperty({ description: 'ID Supabase de l\'utilisateur' })
+  @ApiProperty({ description: "ID Supabase de l'utilisateur" })
   @IsString()
   supabaseId: string;
 
-  @ApiProperty({ description: 'Nom d\'utilisateur unique' })
+  @ApiProperty({ description: "Nom d'utilisateur unique" })
   @IsString()
   username: string;
 
@@ -29,7 +29,10 @@ export class CreateUserDto {
   @IsBoolean()
   darkModeEnabled?: boolean;
 
-  @ApiProperty({ description: 'Paramètres de confidentialité', required: false })
+  @ApiProperty({
+    description: 'Paramètres de confidentialité',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   privacySettings?: 'public' | 'friends' | 'private';

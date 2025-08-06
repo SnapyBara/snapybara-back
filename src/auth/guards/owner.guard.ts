@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 
 @Injectable()
 export class OwnerGuard implements CanActivate {
@@ -18,8 +23,11 @@ export class OwnerGuard implements CanActivate {
 
     // Check if user is accessing their own data
     const resourceId = params.id || params.userId || params.supabaseId;
-    
-    if (resourceId && (resourceId === user.mongoId || resourceId === user.supabaseId)) {
+
+    if (
+      resourceId &&
+      (resourceId === user.mongoId || resourceId === user.supabaseId)
+    ) {
       return true;
     }
 

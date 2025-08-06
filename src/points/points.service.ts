@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -9,16 +10,43 @@ import {
   PointOfInterest,
   PointOfInterestDocument,
 } from './schemas/point-of-interest.schema';
-import { CreatePointOfInterestDto } from './dto/create-point.dto';
+import { CreatePointOfInterestDto, POICategory } from './dto/create-point.dto';
 import { UpdatePointOfInterestDto } from './dto/update-point.dto';
 import { SearchPointsDto } from './dto/search-points.dto';
+import { CreatePointWithPhotosDto } from './dto/create-point-with-photos.dto';
+import { GooglePlacesService } from '../google-places/google-places.service';
+import { PhotosService } from '../photos/photos.service';
+import { UploadService } from '../upload/upload.service';
+import { Photo } from '../photos/schemas/photo.schema';
+import { OverpassService } from '../overpass/overpass.service';
+import { PhotoEnrichmentService } from '../overpass/photo-enrichment.service';
+import * as sharp from 'sharp';
 
 @Injectable()
 export class PointsService {
+  private readonly logger = new Logger(PointsService.name);
+
   constructor(
     @InjectModel(PointOfInterest.name)
     private pointModel: Model<PointOfInterestDocument>,
+    private googlePlacesService: GooglePlacesService,
+    private photosService: PhotosService,
+    private uploadService: UploadService,
+    private overpassService: OverpassService,
+    private photoEnrichmentService: PhotoEnrichmentService,
   ) {}
+
+  /**
+   * Convert enum categories to lowercase strings for MongoDB
+   */
+  private categoriesToStrings(
+    categories?: POICategory[],
+  ): string[] | undefined {
+    if (!categories) return undefined;
+    return categories.map((cat) =>
+      typeof cat === 'string' ? cat.toLowerCase() : cat,
+    );
+  }
 
   async create(
     createPointDto: CreatePointOfInterestDto,
@@ -26,6 +54,10 @@ export class PointsService {
   ): Promise<PointOfInterest> {
     const createdPoint = new this.pointModel({
       ...createPointDto,
+      location: {
+        type: 'Point',
+        coordinates: [createPointDto.longitude, createPointDto.latitude],
+      },
       userId: new Types.ObjectId(userId),
       status: 'pending',
       statistics: {
@@ -38,6 +70,186 @@ export class PointsService {
     return createdPoint.save();
   }
 
+  /**
+   * Create a point of interest with photos
+   */
+  async createWithPhotos(
+    createPointWithPhotosDto: CreatePointWithPhotosDto,
+    userId: string,
+  ): Promise<{
+    point: PointOfInterest;
+    photos: Photo[];
+  }> {
+    const session = await this.pointModel.db.startSession();
+    session.startTransaction();
+
+    try {
+      const pointData = {
+        name: createPointWithPhotosDto.name,
+        description: createPointWithPhotosDto.description,
+        latitude: createPointWithPhotosDto.latitude,
+        longitude: createPointWithPhotosDto.longitude,
+        location: {
+          type: 'Point',
+          coordinates: [
+            createPointWithPhotosDto.longitude,
+            createPointWithPhotosDto.latitude,
+          ],
+        },
+        category: createPointWithPhotosDto.category,
+        userId: new Types.ObjectId(userId),
+        status: 'pending',
+        isPublic: createPointWithPhotosDto.isPublic ?? true,
+        tags: createPointWithPhotosDto.tags || [],
+        address: createPointWithPhotosDto.address,
+        metadata: {
+          ...createPointWithPhotosDto.metadata,
+          googlePlaceId: createPointWithPhotosDto.googlePlaceId,
+          bestTimeToVisit: createPointWithPhotosDto.bestTimeToVisit,
+          accessibilityInfo: createPointWithPhotosDto.accessibilityInfo,
+          photographyTips: createPointWithPhotosDto.photographyTips,
+          isFreeAccess: createPointWithPhotosDto.isFreeAccess,
+          requiresPermission: createPointWithPhotosDto.requiresPermission,
+          difficulty: createPointWithPhotosDto.difficulty,
+        },
+        statistics: {
+          averageRating: 0,
+          totalReviews: 0,
+          totalPhotos: createPointWithPhotosDto.photos.length,
+          totalLikes: 0,
+        },
+      };
+
+      const createdPoint = new this.pointModel(pointData);
+      await createdPoint.save({ session });
+
+      const uploadedPhotos: Photo[] = [];
+
+      for (const photoDto of createPointWithPhotosDto.photos) {
+        try {
+          let photoData;
+
+          if (photoDto.imageData.startsWith('data:image')) {
+            const matches = photoDto.imageData.match(
+              /^data:image\/(\w+);base64,(.+)$/,
+            );
+            if (!matches) {
+              throw new BadRequestException('Invalid base64 image format');
+            }
+
+            const imageBuffer = Buffer.from(matches[2], 'base64');
+            const mimeType = `image/${matches[1]}`;
+
+            const file: Express.Multer.File = {
+              buffer: imageBuffer,
+              mimetype: mimeType,
+              originalname: `photo-${Date.now()}.${matches[1]}`,
+              size: imageBuffer.length,
+              fieldname: 'photo',
+              encoding: '7bit',
+              destination: '',
+              filename: '',
+              path: '',
+              stream: null as any,
+            };
+
+            photoData = await this.uploadService.uploadPhoto(file, userId);
+          } else if (photoDto.imageData.startsWith('http')) {
+            const response = await fetch(photoDto.imageData);
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
+            const contentType =
+              response.headers.get('content-type') || 'image/jpeg';
+
+            const file: Express.Multer.File = {
+              buffer,
+              mimetype: contentType,
+              originalname: `photo-${Date.now()}.jpg`,
+              size: buffer.length,
+              fieldname: 'photo',
+              encoding: '7bit',
+              destination: '',
+              filename: '',
+              path: '',
+              stream: null as any,
+            };
+
+            photoData = await this.uploadService.uploadPhoto(file, userId);
+          } else {
+            throw new BadRequestException('Invalid image data format');
+          }
+
+          let exifData = {};
+          if (photoDto.metadata) {
+            exifData = {
+              camera: photoDto.metadata.camera,
+              lens: photoDto.metadata.lens,
+              focalLength: photoDto.metadata.focalLength,
+              aperture: photoDto.metadata.aperture,
+              shutterSpeed: photoDto.metadata.shutterSpeed,
+              iso: photoDto.metadata.iso,
+              capturedAt: photoDto.metadata.capturedAt,
+              weather: photoDto.metadata.weather,
+              timeOfDay: photoDto.metadata.timeOfDay,
+            };
+          }
+
+          const photo = await this.photosService.create(
+            {
+              pointId: createdPoint._id.toString(),
+              url: photoData.url,
+              thumbnailUrl: photoData.thumbnailUrl,
+              mediumUrl: photoData.mediumUrl,
+              caption: photoDto.caption,
+              metadata: {
+                ...photoData.metadata,
+                ...exifData,
+              },
+              tags: photoDto.tags || [],
+              isPublic: createPointWithPhotosDto.isPublic ?? true,
+            },
+            userId,
+            session,
+          );
+
+          uploadedPhotos.push(photo);
+        } catch (error) {
+          this.logger.error('Error uploading photo:', error);
+        }
+      }
+
+      if (uploadedPhotos.length > 0) {
+        await this.pointModel.updateOne(
+          { _id: createdPoint._id },
+          {
+            $set: {
+              'statistics.totalPhotos': uploadedPhotos.length,
+            },
+          },
+          { session },
+        );
+      }
+
+      await session.commitTransaction();
+
+      const populatedPoint = await this.pointModel
+        .findById(createdPoint._id)
+        .populate('userId', 'username profilePicture')
+        .exec();
+
+      return {
+        point: populatedPoint!,
+        photos: uploadedPhotos,
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
   async findAll(searchDto: SearchPointsDto): Promise<{
     data: PointOfInterest[];
     total: number;
@@ -47,24 +259,164 @@ export class PointsService {
     const { page = 1, limit = 20, ...filters } = searchDto;
     const skip = (page - 1) * limit;
 
-    const query: any = { isActive: true, status: 'approved' };
+    // Convertir les catégories enum en strings pour MongoDB
+    const categoriesAsStrings = this.categoriesToStrings(filters.categories);
 
-    // Location-based search
+    // Si on a une recherche géographique, utiliser l'agrégation avec $geoNear
     if (filters.latitude && filters.longitude && filters.radius) {
-      query.location = {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [filters.longitude, filters.latitude],
+      const pipeline: any[] = [
+        {
+          $geoNear: {
+            near: {
+              type: 'Point',
+              coordinates: [filters.longitude, filters.latitude],
+            },
+            distanceField: 'distance',
+            maxDistance: filters.radius * 1000, // Convert km to meters
+            spherical: true,
+            query: { isActive: true, status: 'approved' },
           },
-          $maxDistance: filters.radius * 1000, // Convert km to meters
         },
-      };
+      ];
+
+      // Ajouter les filtres dans le $match après $geoNear
+      const matchConditions: any = {};
+
+      if (categoriesAsStrings && categoriesAsStrings.length > 0) {
+        matchConditions.category = { $in: categoriesAsStrings };
+      }
+
+      if (filters.minRating) {
+        matchConditions['statistics.averageRating'] = {
+          $gte: filters.minRating,
+        };
+      }
+
+      if (filters.hasPhotos) {
+        matchConditions['statistics.totalPhotos'] = { $gt: 0 };
+      }
+
+      if (filters.tags && filters.tags.length > 0) {
+        matchConditions.tags = { $in: filters.tags };
+      }
+
+      if (filters.search) {
+        matchConditions.$or = [
+          { name: { $regex: filters.search, $options: 'i' } },
+          { description: { $regex: filters.search, $options: 'i' } },
+          { tags: { $regex: filters.search, $options: 'i' } },
+        ];
+      }
+
+      if (Object.keys(matchConditions).length > 0) {
+        pipeline.push({ $match: matchConditions });
+      }
+
+      // Ajouter le tri
+      let sortField: any = {};
+      switch (filters.sortBy) {
+        case 'rating':
+          sortField = { 'statistics.averageRating': -1 };
+          break;
+        case 'recent':
+          sortField = { createdAt: -1 };
+          break;
+        case 'popular':
+          sortField = { viewCount: -1 };
+          break;
+        default:
+          // Par défaut, trier par distance (déjà fait par $geoNear)
+          sortField = { distance: 1 };
+      }
+
+      if (Object.keys(sortField).length > 0 && filters.sortBy !== 'distance') {
+        pipeline.push({ $sort: sortField });
+      }
+
+      // Ajouter la pagination
+      pipeline.push({ $skip: skip });
+      pipeline.push({ $limit: limit });
+
+      // Ajouter le lookup pour populate userId
+      pipeline.push({
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'userId',
+        },
+      });
+      pipeline.push({
+        $unwind: {
+          path: '$userId',
+          preserveNullAndEmptyArrays: true,
+        },
+      });
+      pipeline.push({
+        $project: {
+          _id: 1,
+          name: 1,
+          description: 1,
+          latitude: 1,
+          longitude: 1,
+          location: 1,
+          category: 1,
+          address: 1,
+          photos: 1,
+          tags: 1,
+          statistics: 1,
+          metadata: 1,
+          userId: {
+            _id: '$userId._id',
+            username: '$userId.username',
+            profilePicture: '$userId.profilePicture',
+          },
+          status: 1,
+          isActive: 1,
+          isPublic: 1,
+          viewCount: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          distance: 1,
+        },
+      });
+
+      const data = await this.pointModel.aggregate(pipeline);
+
+      // Pour le total, on doit faire une requête séparée
+      const totalPipeline: any[] = [
+        {
+          $geoNear: {
+            near: {
+              type: 'Point',
+              coordinates: [filters.longitude, filters.latitude],
+            },
+            distanceField: 'distance',
+            maxDistance: filters.radius * 1000,
+            spherical: true,
+            query: { isActive: true, status: 'approved' },
+          },
+        },
+      ];
+
+      if (Object.keys(matchConditions).length > 0) {
+        totalPipeline.push({ $match: matchConditions });
+      }
+
+      totalPipeline.push({ $count: 'total' });
+
+      const totalResult = await this.pointModel.aggregate(totalPipeline);
+      const total = totalResult.length > 0 ? totalResult[0].total : 0;
+
+      return { data, total, page, limit };
     }
 
+    // Si pas de recherche géographique, utiliser la requête normale
+    const query: any = { isActive: true, status: 'approved' };
+
     // Category filter
-    if (filters.categories && filters.categories.length > 0) {
-      query.category = { $in: filters.categories };
+    if (categoriesAsStrings && categoriesAsStrings.length > 0) {
+      query.category = { $in: categoriesAsStrings };
     }
 
     // Rating filter
@@ -101,10 +453,7 @@ export class PointsService {
         sort = { viewCount: -1 };
         break;
       default:
-        if (filters.latitude && filters.longitude) {
-        } else {
-          sort = { createdAt: -1 };
-        }
+        sort = { createdAt: -1 };
     }
 
     const [data, total] = await Promise.all([
@@ -228,5 +577,610 @@ export class PointsService {
       .limit(50)
       .populate('userId', 'username profilePicture')
       .exec();
+  }
+
+  /**
+   * Recherche hybride : MongoDB d'abord, puis OpenStreetMap/Overpass pour combler les manques
+   */
+  async searchHybrid(searchDto: SearchPointsDto): Promise<{
+    data: PointOfInterest[];
+    total: number;
+    page: number;
+    limit: number;
+    sources: { mongodb: number; openstreetmap: number };
+  }> {
+    const { page = 1, limit = 20 } = searchDto;
+
+    // Limiter à 200 points maximum pour avoir un bon équilibre performance/complétude
+    const effectiveLimit = Math.min(limit, 200);
+
+    // 1. Chercher d'abord dans MongoDB (priorité)
+    const mongoResults = await this.findAll({
+      ...searchDto,
+      limit: effectiveLimit,
+    });
+
+    const finalResults = [...mongoResults.data];
+    let osmCount = 0;
+
+    // Créer un index des positions existantes pour éviter les doublons
+    const existingPositions = new Map<string, PointOfInterest>();
+    const existingOsmIds = new Set<string>();
+
+    // Indexer les résultats MongoDB par position et OSM ID
+    mongoResults.data.forEach((point) => {
+      const posKey = `${point.latitude.toFixed(6)}_${point.longitude.toFixed(6)}`;
+      existingPositions.set(posKey, point);
+
+      if (point.metadata?.osmId) {
+        existingOsmIds.add(point.metadata.osmId);
+      }
+    });
+
+    // 2. Si pas assez de résultats et qu'on a des coordonnées, compléter avec OSM
+    const remainingSlots = effectiveLimit - mongoResults.data.length;
+
+    if (
+      remainingSlots > 0 &&
+      searchDto.latitude &&
+      searchDto.longitude &&
+      searchDto.includeOpenStreetMap
+    ) {
+      this.logger.debug(
+        `MongoDB returned ${mongoResults.data.length} results, fetching ${remainingSlots} more from OSM`,
+      );
+
+      try {
+        // Utiliser le service Overpass pour récupérer des POIs OSM
+        const osmResults = await this.overpassService.searchPOIs(
+          searchDto.latitude,
+          searchDto.longitude,
+          searchDto.radius || 3, // Rayon en km
+          searchDto.categories?.map((cat) => cat.toLowerCase()),
+        );
+
+        // Filtrer les résultats OSM
+        for (const osmPOI of osmResults.data || []) {
+          if (finalResults.length >= effectiveLimit) break;
+
+          // Vérifier si ce POI OSM existe déjà
+          if (existingOsmIds.has(osmPOI.id)) {
+            this.logger.debug(
+              `Skipping OSM POI ${osmPOI.id} - already exists in MongoDB`,
+            );
+            continue;
+          }
+
+          // Vérifier si un POI existe déjà à cette position (tolérance de 100m)
+          const posKey = `${osmPOI.lat.toFixed(6)}_${osmPOI.lon.toFixed(6)}`;
+          let isDuplicate = false;
+
+          // Vérification plus stricte : chercher dans un rayon de 100m
+          for (const [existingKey, existingPoint] of existingPositions) {
+            const distance = this.calculateDistance(
+              osmPOI.lat,
+              osmPOI.lon,
+              existingPoint.latitude,
+              existingPoint.longitude,
+            );
+
+            if (distance < 100) {
+              // 100 mètres
+              this.logger.debug(
+                `Skipping OSM POI "${osmPOI.name}" - too close to existing "${existingPoint.name}" (${distance}m)`,
+              );
+              isDuplicate = true;
+              break;
+            }
+          }
+
+          if (isDuplicate) continue;
+
+          // Mapper le type OSM vers nos catégories
+          const category = this.mapOSMTypeToCategory(osmPOI.type);
+
+          // Filtrer par catégorie si spécifiée
+          if (searchDto.categories && searchDto.categories.length > 0) {
+            const categoriesAsStrings = this.categoriesToStrings(
+              searchDto.categories,
+            );
+            if (!categoriesAsStrings?.includes(category)) {
+              continue;
+            }
+          }
+
+          // Créer un objet temporaire qui ressemble à un PointOfInterest
+          const poiData = {
+            _id: new Types.ObjectId(),
+            id: new Types.ObjectId().toString(),
+            name: osmPOI.name,
+            description: this.generateDescription(osmPOI),
+            latitude: osmPOI.lat,
+            longitude: osmPOI.lon,
+            location: {
+              type: 'Point',
+              coordinates: [osmPOI.lon, osmPOI.lat],
+            },
+            category,
+            address: {
+              formattedAddress:
+                osmPOI.tags['addr:full'] ||
+                `${osmPOI.tags['addr:street'] || ''} ${osmPOI.tags['addr:housenumber'] || ''}`.trim() ||
+                osmPOI.tags['addr:city'] ||
+                null,
+              street: osmPOI.tags['addr:street'] || null,
+              city: osmPOI.tags['addr:city'] || null,
+              postalCode: osmPOI.tags['addr:postcode'] || null,
+              country: osmPOI.tags['addr:country'] || null,
+            },
+            photos: [],
+            tags: this.extractTags(osmPOI),
+            statistics: {
+              averageRating: 0,
+              totalReviews: 0,
+              totalPhotos: 0,
+              totalLikes: 0,
+            },
+            metadata: {
+              source: 'openstreetmap',
+              osmId: osmPOI.id,
+              osmType: osmPOI.type,
+              osmTags: osmPOI.tags,
+              lastSync: new Date(),
+              imageUrl: osmPOI.tags['image_url'],
+              wikipedia: osmPOI.tags['wikipedia'],
+              wikidata: osmPOI.tags['wikidata'],
+              website: osmPOI.tags['website'],
+              openingHours: osmPOI.tags['opening_hours'],
+            },
+            userId: null,
+            isPublic: true,
+            isActive: true,
+            status: 'approved',
+            viewCount: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as any;
+
+          // Ajouter à la liste finale et à l'index des positions
+          finalResults.push(poiData);
+          existingPositions.set(posKey, poiData);
+          osmCount++;
+        }
+
+        this.logger.debug(`Added ${osmCount} unique POIs from OpenStreetMap`);
+      } catch (error) {
+        this.logger.error('Error fetching OSM results:', error);
+      }
+    }
+
+    return {
+      data: finalResults.slice(0, effectiveLimit),
+      total: mongoResults.total + osmCount,
+      page,
+      limit: effectiveLimit,
+      sources: {
+        mongodb: mongoResults.data.length,
+        openstreetmap: osmCount,
+      },
+    };
+  }
+
+  /**
+   * Calculer la distance entre deux points en mètres
+   */
+  private calculateDistance(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
+    const R = 6371e3; // Rayon de la Terre en mètres
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  }
+
+  /**
+   * Mapper les types OSM vers nos catégories
+   */
+  private mapOSMTypeToCategory(osmType: string): string {
+    const mapping: Record<string, string> = {
+      viewpoint: 'landscape',
+      museum: 'historical',
+      monument: 'historical',
+      memorial: 'historical',
+      castle: 'historical',
+      ruins: 'historical',
+      cathedral: 'architecture',
+      church: 'architecture',
+      chapel: 'architecture',
+      religious: 'architecture',
+      artwork: 'street_art',
+      statue: 'street_art',
+      fountain: 'architecture',
+      bridge: 'architecture',
+      tower: 'architecture',
+      waterfall: 'landscape',
+      cliff: 'landscape',
+      peak: 'mountain',
+      lake: 'landscape',
+      beach: 'landscape',
+      garden: 'forest',
+      park: 'forest',
+      square: 'architecture',
+      attraction: 'landscape',
+    };
+
+    return mapping[osmType] || 'other';
+  }
+
+  /**
+   * Générer une description depuis les tags OSM
+   */
+  private generateDescription(osmPOI: any): string {
+    const parts: string[] = [];
+
+    if (osmPOI.tags['description']) {
+      parts.push(osmPOI.tags['description']);
+    }
+
+    if (osmPOI.tags['tourism']) {
+      parts.push(`Type: ${osmPOI.tags['tourism']}`);
+    }
+
+    if (osmPOI.tags['historic']) {
+      parts.push(`Historic: ${osmPOI.tags['historic']}`);
+    }
+
+    if (osmPOI.tags['heritage']) {
+      parts.push('Site classé au patrimoine');
+    }
+
+    return parts.join('. ') || `${osmPOI.type} - ${osmPOI.name}`;
+  }
+
+  /**
+   * Extraire des tags pertinents depuis OSM
+   */
+  private extractTags(osmPOI: any): string[] {
+    const tags: string[] = [];
+
+    if (osmPOI.type) tags.push(osmPOI.type);
+    if (osmPOI.tags['tourism']) tags.push(osmPOI.tags['tourism']);
+    if (osmPOI.tags['historic']) tags.push(osmPOI.tags['historic']);
+    if (osmPOI.tags['amenity']) tags.push(osmPOI.tags['amenity']);
+    if (osmPOI.tags['heritage']) tags.push('patrimoine');
+    if (osmPOI.tags['wikipedia']) tags.push('wikipedia');
+
+    return [...new Set(tags)]; // Dédupliquer
+  }
+
+  /**
+   * Recherche dans Google Places
+   */
+  private async searchGooglePlaces(
+    searchDto: SearchPointsDto,
+    limit: number,
+  ): Promise<any[]> {
+    const { latitude, longitude, search, radius = 10 } = searchDto;
+
+    if (!latitude || !longitude) {
+      return [];
+    }
+
+    // S'assurer que le rayon ne dépasse pas 50km (limite Google Places)
+    const safeRadius = Math.min(radius, 50);
+    const radiusInMeters = safeRadius * 1000; // Convertir km en mètres
+
+    let results: any[] = [];
+
+    // Si on cherche spécifiquement dans la catégorie montagne, ajouter des mots-clés pertinents
+    const categoriesAsStrings = this.categoriesToStrings(searchDto.categories);
+
+    if (categoriesAsStrings?.includes('mountain')) {
+      const mountainKeywords = ['pic', 'mont', 'sommet', 'col', 'crête'];
+      for (const keyword of mountainKeywords) {
+        const keywordResults = await this.googlePlacesService.textSearch({
+          query: keyword,
+          latitude,
+          longitude,
+          radius: radiusInMeters,
+        });
+        results = results.concat(keywordResults);
+      }
+    }
+
+    // Recherche textuelle si un terme de recherche est fourni
+    if (search) {
+      const textResults = await this.googlePlacesService.textSearch({
+        query: search,
+        latitude,
+        longitude,
+        radius: radiusInMeters,
+      });
+      results = results.concat(textResults);
+    }
+
+    // Recherche à proximité pour compléter
+    if (results.length < limit) {
+      const nearbyResults = await this.googlePlacesService.nearbySearch({
+        latitude,
+        longitude,
+        radius: radiusInMeters,
+        keyword: search,
+      });
+
+      // Éviter les doublons
+      const existingPlaceIds = new Set(results.map((r) => r.place_id));
+      const uniqueNearbyResults = nearbyResults.filter(
+        (r) => !existingPlaceIds.has(r.place_id),
+      );
+
+      results = results.concat(uniqueNearbyResults);
+    }
+
+    // Si on cherche des lieux naturels et qu'on a peu de résultats, faire une recherche spécifique
+    if (results.length < limit / 2) {
+      const natureKeywords = [
+        'viewpoint',
+        'belvédère',
+        'panorama',
+        'site naturel',
+      ];
+      for (const keyword of natureKeywords) {
+        if (results.length >= limit) break;
+
+        const natureResults = await this.googlePlacesService.textSearch({
+          query: keyword,
+          latitude,
+          longitude,
+          radius: radiusInMeters,
+        });
+
+        const existingPlaceIds = new Set(results.map((r) => r.place_id));
+        const uniqueResults = natureResults.filter(
+          (r) => !existingPlaceIds.has(r.place_id),
+        );
+        results = results.concat(uniqueResults);
+      }
+    }
+
+    // Dédupliquer une dernière fois
+    const uniqueResults = Array.from(
+      new Map(results.map((item) => [item.place_id, item])).values(),
+    );
+
+    return uniqueResults.slice(0, limit);
+  }
+
+  /**
+   * Filtrer les lieux OSM qui existent déjà dans MongoDB
+   */
+  private async filterExistingPlaces(osmResults: any): Promise<any[]> {
+    if (!osmResults?.data || osmResults.data.length === 0) return [];
+
+    const osmPOIs = osmResults.data;
+
+    // Rechercher dans MongoDB par osmId dans les métadonnées
+    const osmIds = osmPOIs.map((poi) => poi.id);
+
+    const existingPlaces = await this.pointModel
+      .find({
+        'metadata.osmId': { $in: osmIds },
+      })
+      .select('metadata.osmId')
+      .exec();
+
+    const existingOsmIds = new Set(
+      existingPlaces.map((place) => place.metadata?.osmId),
+    );
+
+    // Filtrer aussi par proximité géographique pour éviter les doublons
+    const filtered: any[] = [];
+
+    for (const poi of osmPOIs) {
+      // Skip si déjà existant par OSM ID
+      if (existingOsmIds.has(poi.id)) {
+        continue;
+      }
+
+      // Vérifier la proximité géographique (éviter les doublons à moins de 100m)
+      // Utiliser une requête aggregate au lieu de $near dans un $or
+      const nearbyExisting = await this.pointModel.aggregate([
+        {
+          $geoNear: {
+            near: {
+              type: 'Point',
+              coordinates: [poi.lon, poi.lat],
+            },
+            distanceField: 'distance',
+            maxDistance: 100, // 100 mètres
+            spherical: true,
+            query: { isActive: true },
+          },
+        },
+        { $limit: 1 },
+      ]);
+
+      if (nearbyExisting.length === 0) {
+        filtered.push(poi);
+      }
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Obtenir les détails d'un lieu depuis Google Places et l'ajouter optionnellement à MongoDB
+   */
+  async getPlaceFromGooglePlaces(
+    placeId: string,
+    saveToMongoDB: boolean = false,
+  ): Promise<any> {
+    const googlePlace = await this.googlePlacesService.getPlaceDetails(placeId);
+
+    if (!googlePlace) {
+      throw new NotFoundException('Place not found in Google Places');
+    }
+
+    const convertedPlace =
+      this.googlePlacesService.convertToPointOfInterest(googlePlace);
+
+    if (saveToMongoDB) {
+      // Créer un point dans MongoDB avec un utilisateur système ou sans utilisateur
+      const savedPoint = new this.pointModel({
+        ...convertedPlace,
+        location: {
+          type: 'Point',
+          coordinates: [convertedPlace.longitude, convertedPlace.latitude],
+        },
+        userId: null, // Ou créer un utilisateur système
+        status: 'approved',
+        isPublic: true,
+        metadata: {
+          ...convertedPlace.metadata,
+          importedFromGooglePlaces: true,
+          importedAt: new Date(),
+        },
+      });
+
+      return await savedPoint.save();
+    }
+
+    return {
+      ...convertedPlace,
+      id: new Types.ObjectId().toString(), // ID temporaire
+      location: {
+        type: 'Point',
+        coordinates: [convertedPlace.longitude, convertedPlace.latitude],
+      },
+      userId: null,
+      isPublic: true,
+      isActive: true,
+      status: 'approved',
+      viewCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  /**
+   * Importer des lieux depuis Google Places dans une zone géographique
+   */
+  async importFromGooglePlaces(
+    latitude: number,
+    longitude: number,
+    radiusKm: number = 5,
+    maxPlaces: number = 50,
+  ): Promise<{ imported: number; skipped: number; errors: number }> {
+    let imported = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    try {
+      // S'assurer que le rayon ne dépasse pas 50km (limite Google Places)
+      const safeRadius = Math.min(radiusKm, 50);
+
+      const googlePlaces = await this.googlePlacesService.nearbySearch({
+        latitude,
+        longitude,
+        radius: safeRadius * 1000, // Convertir km en mètres
+      });
+
+      const filteredPlaces = await this.filterExistingPlaces(googlePlaces);
+      const placesToImport = filteredPlaces.slice(0, maxPlaces);
+
+      for (const googlePlace of placesToImport) {
+        try {
+          const convertedPlace =
+            this.googlePlacesService.convertToPointOfInterest(googlePlace);
+
+          const newPoint = new this.pointModel({
+            ...convertedPlace,
+            location: {
+              type: 'Point',
+              coordinates: [convertedPlace.longitude, convertedPlace.latitude],
+            },
+            userId: null, // Ou créer un utilisateur système
+            status: 'approved',
+            isPublic: true,
+            metadata: {
+              ...convertedPlace.metadata,
+              importedFromGooglePlaces: true,
+              importedAt: new Date(),
+            },
+          });
+
+          await newPoint.save();
+          imported++;
+        } catch (error) {
+          this.logger.error(
+            `Error importing place ${googlePlace.place_id}:`,
+            error,
+          );
+          errors++;
+        }
+      }
+
+      skipped = filteredPlaces.length - placesToImport.length;
+
+      this.logger.log(
+        `Import completed: ${imported} imported, ${skipped} skipped, ${errors} errors`,
+      );
+    } catch (error) {
+      this.logger.error('Error during Google Places import:', error);
+      errors++;
+    }
+
+    return { imported, skipped, errors };
+  }
+
+  /**
+   * Enrichir des POIs avec des photos - endpoint pour progressive loading
+   */
+  async enrichPOIsWithPhotos(pois: any[]): Promise<Record<string, any[]>> {
+    const result: Record<string, any[]> = {};
+
+    // Limiter à 5 POI à la fois pour éviter les timeouts
+    const poisToProcess = pois.slice(0, 5);
+
+    // TODO: Ajouter le cache ici quand CacheService sera injecté
+    // Pour l'instant, on enrichit directement
+
+    try {
+      // Enrichir les POI avec le service
+      const enrichedPOIs =
+        await this.photoEnrichmentService.enrichPOIsWithPhotos(poisToProcess);
+
+      // Extraire les photos pour chaque POI
+      for (const poi of enrichedPOIs) {
+        if (poi.photos && poi.photos.length > 0) {
+          result[poi.id] = poi.photos.map((photo) => ({
+            reference: photo.url,
+            url: photo.url,
+            width: photo.width || 800,
+            height: photo.height || 600,
+            attribution: photo.attribution,
+          }));
+        }
+      }
+
+      this.logger.debug(
+        `Enriched ${Object.keys(result).length} POIs with photos`,
+      );
+    } catch (error) {
+      this.logger.error('Failed to enrich POIs with photos', error);
+    }
+
+    return result;
   }
 }

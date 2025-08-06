@@ -21,14 +21,15 @@ export class HealthController {
   constructor(private configService: ConfigService) {}
 
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Health check',
-    description: 'Returns the health status of the application and its services'
+    description:
+      'Returns the health status of the application and its services',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Health check successful',
-    type: HealthResponseDto
+    type: HealthResponseDto,
   })
   getHealth(): HealthResponseDto {
     return {
@@ -46,13 +47,13 @@ export class HealthController {
   }
 
   @Get('ready')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Readiness check',
-    description: 'Returns whether the application is ready to handle requests'
+    description: 'Returns whether the application is ready to handle requests',
   })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Application is ready'
+  @ApiResponse({
+    status: 200,
+    description: 'Application is ready',
   })
   getReadiness() {
     return {
@@ -68,13 +69,13 @@ export class HealthController {
   }
 
   @Get('live')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Liveness check',
-    description: 'Returns whether the application is alive and running'
+    description: 'Returns whether the application is alive and running',
   })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Application is alive'
+  @ApiResponse({
+    status: 200,
+    description: 'Application is alive',
   })
   getLiveness() {
     return {

@@ -91,7 +91,7 @@ export class EmailController {
           return res.status(400).send(this.getErrorPage());
         }
       }
-      
+
       if (access_token && refresh_token) {
         console.log("✅ Confirmation réussie - Tokens d'accès reçus");
         if (isMobile) {
@@ -178,13 +178,13 @@ export class EmailController {
 
       if (access_token && refresh_token) {
         console.log('✅ Tokens reçus, affichage du formulaire');
-        
+
         if (isMobile) {
           console.log('📱 Mobile détecté → Redirection vers app avec tokens');
           const appUrl = `snapybara://auth/password-reset?access_token=${encodeURIComponent(access_token)}&refresh_token=${encodeURIComponent(refresh_token)}`;
           return res.redirect(appUrl);
         }
-        
+
         return res.send(
           this.getResetPasswordForm(access_token, refresh_token, expires_in),
         );

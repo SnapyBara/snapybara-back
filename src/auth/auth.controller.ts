@@ -7,7 +7,12 @@ import {
   HttpStatus,
   HttpException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -90,7 +95,6 @@ export class AuthController {
     // For now, just return the current user data
     const user = await this.usersService.findOne(currentUser.mongoId);
     await this.usersService.updateLastLogin(currentUser.mongoId);
-    
     return {
       message: 'User data refreshed successfully',
       user: {

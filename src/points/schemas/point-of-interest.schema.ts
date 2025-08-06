@@ -26,6 +26,22 @@ export class PointOfInterest {
   longitude: number;
 
   @Prop({
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point',
+    },
+    coordinates: {
+      type: [Number],
+      required: true,
+    },
+  })
+  location: {
+    type: string;
+    coordinates: number[];
+  };
+
+  @Prop({
     required: true,
     enum: [
       'landscape',
@@ -98,11 +114,3 @@ PointOfInterestSchema.index({ category: 1 });
 PointOfInterestSchema.index({ isPublic: 1, status: 1 });
 PointOfInterestSchema.index({ createdAt: -1 });
 PointOfInterestSchema.index({ 'statistics.averageRating': -1 });
-
-// Virtual for location
-PointOfInterestSchema.virtual('location').get(function() {
-  return {
-    type: 'Point',
-    coordinates: [this.longitude, this.latitude],
-  };
-});

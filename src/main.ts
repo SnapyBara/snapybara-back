@@ -70,7 +70,11 @@ async function bootstrap() {
     )
     .addServer('http://localhost:3000', 'Development server')
     .addServer('https://api.snapybara.com', 'Production server')
-    .setContact('SnapyBara Team', 'https://snapybara.com', 'contact@snapybara.com')
+    .setContact(
+      'SnapyBara Team',
+      'https://snapybara.com',
+      'contact@snapybara.com',
+    )
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
     .build();
 

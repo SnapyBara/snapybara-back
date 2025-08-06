@@ -29,19 +29,36 @@ export class SearchPointsDto {
   @Type(() => Number)
   longitude?: number;
 
-  @ApiPropertyOptional({ description: 'Radius in kilometers' })
+  @ApiPropertyOptional({
+    description:
+      'Radius in kilometers (max 50km for Google Places compatibility)',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0.1)
-  @Max(100)
+  @Max(50) // Limité à 50km pour être compatible avec Google Places API
   @Type(() => Number)
   radius?: number;
 
   @ApiPropertyOptional({ enum: POICategory, isArray: true })
   @IsOptional()
+  @Transform(({ value }) => {
+    // Si c'est déjà un array, le retourner tel quel
+    if (Array.isArray(value)) {
+      return value;
+    }
+    // Si c'est une chaîne avec des virgules, la diviser
+    if (typeof value === 'string' && value.includes(',')) {
+      return value.split(',').map((v) => v.trim());
+    }
+    // Si c'est une chaîne simple, la mettre dans un array
+    if (typeof value === 'string') {
+      return [value];
+    }
+    return value;
+  })
   @IsArray()
   @IsEnum(POICategory, { each: true })
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   categories?: POICategory[];
 
   @ApiPropertyOptional()
@@ -65,9 +82,23 @@ export class SearchPointsDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Transform(({ value }) => {
+    // Si c'est déjà un array, le retourner tel quel
+    if (Array.isArray(value)) {
+      return value;
+    }
+    // Si c'est une chaîne avec des virgules, la diviser
+    if (typeof value === 'string' && value.includes(',')) {
+      return value.split(',').map((v) => v.trim());
+    }
+    // Si c'est une chaîne simple, la mettre dans un array
+    if (typeof value === 'string') {
+      return [value];
+    }
+    return value;
+  })
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   tags?: string[];
 
   @ApiPropertyOptional({ default: 1 })
@@ -89,4 +120,26 @@ export class SearchPointsDto {
   @IsOptional()
   @IsEnum(['distance', 'rating', 'recent', 'popular'])
   sortBy?: string = 'distance';
+
+  @ApiPropertyOptional({
+    description: 'Include Google Places results in the search',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
+  includeGooglePlaces?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Include OpenStreetMap results in the search',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    // Si la valeur n'est pas définie, retourner true par défaut
+    if (value === undefined || value === null) return true;
+    return value === 'true' || value === true;
+  })
+  includeOpenStreetMap?: boolean = true;
 }
