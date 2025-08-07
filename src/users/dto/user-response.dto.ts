@@ -46,6 +46,13 @@ export class UserResponseDto {
   @Expose()
   language: string;
 
+  @ApiProperty({
+    description: 'User role',
+    enum: ['user', 'moderator', 'admin'],
+  })
+  @Expose()
+  role: string;
+
   @ApiProperty()
   @Expose()
   isActive: boolean;

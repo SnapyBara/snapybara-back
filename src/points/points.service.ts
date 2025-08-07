@@ -20,7 +20,7 @@ import { UploadService } from '../upload/upload.service';
 import { Photo } from '../photos/schemas/photo.schema';
 import { OverpassService } from '../overpass/overpass.service';
 import { PhotoEnrichmentService } from '../overpass/photo-enrichment.service';
-import * as sharp from 'sharp';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class PointsService {
@@ -34,6 +34,7 @@ export class PointsService {
     private uploadService: UploadService,
     private overpassService: OverpassService,
     private photoEnrichmentService: PhotoEnrichmentService,
+    private usersService: UsersService,
   ) {}
 
   /**
@@ -50,15 +51,21 @@ export class PointsService {
 
   async create(
     createPointDto: CreatePointOfInterestDto,
-    userId: string,
+    supabaseUserId: string,
   ): Promise<PointOfInterest> {
+    // Trouver l'utilisateur MongoDB à partir du supabaseId
+    const user = await this.usersService.findBySupabaseId(supabaseUserId);
+    if (!user || !user._id) {
+      throw new BadRequestException('User not found');
+    }
+
     const createdPoint = new this.pointModel({
       ...createPointDto,
       location: {
         type: 'Point',
         coordinates: [createPointDto.longitude, createPointDto.latitude],
       },
-      userId: new Types.ObjectId(userId),
+      userId: user._id, // Utiliser l'ObjectId MongoDB
       status: 'pending',
       statistics: {
         averageRating: 0,
@@ -75,11 +82,17 @@ export class PointsService {
    */
   async createWithPhotos(
     createPointWithPhotosDto: CreatePointWithPhotosDto,
-    userId: string,
+    supabaseUserId: string,
   ): Promise<{
     point: PointOfInterest;
     photos: Photo[];
   }> {
+    // Trouver l'utilisateur MongoDB à partir du supabaseId
+    const user = await this.usersService.findBySupabaseId(supabaseUserId);
+    if (!user || !user._id) {
+      throw new BadRequestException('User not found');
+    }
+
     const session = await this.pointModel.db.startSession();
     session.startTransaction();
 
@@ -97,7 +110,7 @@ export class PointsService {
           ],
         },
         category: createPointWithPhotosDto.category,
-        userId: new Types.ObjectId(userId),
+        userId: user._id, // Utiliser l'ObjectId MongoDB
         status: 'pending',
         isPublic: createPointWithPhotosDto.isPublic ?? true,
         tags: createPointWithPhotosDto.tags || [],
@@ -153,7 +166,7 @@ export class PointsService {
               stream: null as any,
             };
 
-            photoData = await this.uploadService.uploadPhoto(file, userId);
+            photoData = await this.uploadService.uploadPhoto(file, supabaseUserId);
           } else if (photoDto.imageData.startsWith('http')) {
             const response = await fetch(photoDto.imageData);
             const arrayBuffer = await response.arrayBuffer();
@@ -175,7 +188,7 @@ export class PointsService {
               stream: null as any,
             };
 
-            photoData = await this.uploadService.uploadPhoto(file, userId);
+            photoData = await this.uploadService.uploadPhoto(file, supabaseUserId);
           } else {
             throw new BadRequestException('Invalid image data format');
           }
@@ -209,7 +222,7 @@ export class PointsService {
               tags: photoDto.tags || [],
               isPublic: createPointWithPhotosDto.isPublic ?? true,
             },
-            userId,
+            supabaseUserId,
             session,
           );
 
@@ -489,9 +502,15 @@ export class PointsService {
     return point;
   }
 
-  async findByUser(userId: string): Promise<PointOfInterest[]> {
+  async findByUser(supabaseUserId: string): Promise<PointOfInterest[]> {
+    // Trouver l'utilisateur MongoDB à partir du supabaseId
+    const user = await this.usersService.findBySupabaseId(supabaseUserId);
+    if (!user || !user._id) {
+      return [];
+    }
+
     return this.pointModel
-      .find({ userId: new Types.ObjectId(userId), isActive: true })
+      .find({ userId: user._id, isActive: true })
       .sort({ createdAt: -1 })
       .exec();
   }
@@ -499,10 +518,24 @@ export class PointsService {
   async update(
     id: string,
     updatePointDto: UpdatePointOfInterestDto,
-    userId: string,
+    supabaseUserId: string,
   ): Promise<PointOfInterest> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid point ID');
+    }
+
+    // Trouver l'utilisateur MongoDB à partir du supabaseId
+    const user = await this.usersService.findBySupabaseId(supabaseUserId);
+    if (!user || !user._id) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (!user || !user._id) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (!user || !user._id) {
+      throw new BadRequestException('User not found');
     }
 
     const point = await this.pointModel.findById(id);
@@ -510,7 +543,7 @@ export class PointsService {
       throw new NotFoundException('Point not found');
     }
 
-    if (point.userId.toString() !== userId) {
+    if (point.userId.toString() !== user._id.toString()) {
       throw new BadRequestException('You can only update your own points');
     }
 
@@ -530,9 +563,23 @@ export class PointsService {
     return updated;
   }
 
-  async remove(id: string, userId: string): Promise<void> {
+  async remove(id: string, supabaseUserId: string): Promise<void> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid point ID');
+    }
+
+    // Trouver l'utilisateur MongoDB à partir du supabaseId
+    const user = await this.usersService.findBySupabaseId(supabaseUserId);
+    if (!user || !user._id) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (!user || !user._id) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (!user || !user._id) {
+      throw new BadRequestException('User not found');
     }
 
     const point = await this.pointModel.findById(id);
@@ -540,7 +587,7 @@ export class PointsService {
       throw new NotFoundException('Point not found');
     }
 
-    if (point.userId.toString() !== userId) {
+    if (point.userId.toString() !== user._id.toString()) {
       throw new BadRequestException('You can only delete your own points');
     }
 
@@ -581,14 +628,19 @@ export class PointsService {
 
   /**
    * Recherche hybride : MongoDB d'abord, puis OpenStreetMap/Overpass pour combler les manques
+   * Avec option pour inclure Google Places en mode premium
    */
-  async searchHybrid(searchDto: SearchPointsDto): Promise<{
+  async searchHybrid(searchDto: SearchPointsDto & { includeGooglePlaces?: boolean }): Promise<{
     data: PointOfInterest[];
     total: number;
     page: number;
     limit: number;
-    sources: { mongodb: number; openstreetmap: number };
+    sources: { mongodb: number; openstreetmap: number; googlePlaces?: number };
   }> {
+    this.logger.debug(
+      `SearchHybrid called with includeGooglePlaces=${searchDto.includeGooglePlaces}, includeOpenStreetMap=${searchDto.includeOpenStreetMap}`,
+    );
+    
     const { page = 1, limit = 20 } = searchDto;
 
     // Limiter à 200 points maximum pour avoir un bon équilibre performance/complétude
@@ -602,10 +654,12 @@ export class PointsService {
 
     const finalResults = [...mongoResults.data];
     let osmCount = 0;
+    let googleCount = 0;
 
     // Créer un index des positions existantes pour éviter les doublons
     const existingPositions = new Map<string, PointOfInterest>();
     const existingOsmIds = new Set<string>();
+    const existingGooglePlaceIds = new Set<string>();
 
     // Indexer les résultats MongoDB par position et OSM ID
     mongoResults.data.forEach((point) => {
@@ -615,153 +669,244 @@ export class PointsService {
       if (point.metadata?.osmId) {
         existingOsmIds.add(point.metadata.osmId);
       }
+
+      if (point.metadata?.googlePlaceId) {
+        existingGooglePlaceIds.add(point.metadata.googlePlaceId);
+      }
     });
 
-    // 2. Si pas assez de résultats et qu'on a des coordonnées, compléter avec OSM
+    // 2. Si pas assez de résultats et qu'on a des coordonnées
     const remainingSlots = effectiveLimit - mongoResults.data.length;
 
     if (
       remainingSlots > 0 &&
       searchDto.latitude &&
-      searchDto.longitude &&
-      searchDto.includeOpenStreetMap
+      searchDto.longitude
     ) {
-      this.logger.debug(
-        `MongoDB returned ${mongoResults.data.length} results, fetching ${remainingSlots} more from OSM`,
-      );
-
-      try {
-        // Utiliser le service Overpass pour récupérer des POIs OSM
-        const osmResults = await this.overpassService.searchPOIs(
-          searchDto.latitude,
-          searchDto.longitude,
-          searchDto.radius || 3, // Rayon en km
-          searchDto.categories?.map((cat) => cat.toLowerCase()),
+      // 2.1 Si Google Places est activé (mode premium), l'utiliser en priorité
+      if (searchDto.includeGooglePlaces === true && remainingSlots > 0) {
+        this.logger.debug(
+          `MongoDB returned ${mongoResults.data.length} results, fetching ${remainingSlots} more from Google Places (includeGooglePlaces=${searchDto.includeGooglePlaces})`,
         );
 
-        // Filtrer les résultats OSM
-        for (const osmPOI of osmResults.data || []) {
-          if (finalResults.length >= effectiveLimit) break;
+        try {
+          const googleResults = await this.searchGooglePlaces(searchDto, remainingSlots);
 
-          // Vérifier si ce POI OSM existe déjà
-          if (existingOsmIds.has(osmPOI.id)) {
-            this.logger.debug(
-              `Skipping OSM POI ${osmPOI.id} - already exists in MongoDB`,
-            );
-            continue;
-          }
+          for (const googlePlace of googleResults) {
+            if (finalResults.length >= effectiveLimit) break;
 
-          // Vérifier si un POI existe déjà à cette position (tolérance de 100m)
-          const posKey = `${osmPOI.lat.toFixed(6)}_${osmPOI.lon.toFixed(6)}`;
-          let isDuplicate = false;
-
-          // Vérification plus stricte : chercher dans un rayon de 100m
-          for (const [existingKey, existingPoint] of existingPositions) {
-            const distance = this.calculateDistance(
-              osmPOI.lat,
-              osmPOI.lon,
-              existingPoint.latitude,
-              existingPoint.longitude,
-            );
-
-            if (distance < 100) {
-              // 100 mètres
+            // Vérifier si ce lieu Google existe déjà
+            if (existingGooglePlaceIds.has(googlePlace.place_id)) {
               this.logger.debug(
-                `Skipping OSM POI "${osmPOI.name}" - too close to existing "${existingPoint.name}" (${distance}m)`,
+                `Skipping Google Place ${googlePlace.place_id} - already exists in MongoDB`,
               );
-              isDuplicate = true;
-              break;
-            }
-          }
-
-          if (isDuplicate) continue;
-
-          // Mapper le type OSM vers nos catégories
-          const category = this.mapOSMTypeToCategory(osmPOI.type);
-
-          // Filtrer par catégorie si spécifiée
-          if (searchDto.categories && searchDto.categories.length > 0) {
-            const categoriesAsStrings = this.categoriesToStrings(
-              searchDto.categories,
-            );
-            if (!categoriesAsStrings?.includes(category)) {
               continue;
             }
+
+            // Vérifier la proximité géographique
+            const posKey = `${googlePlace.geometry.location.lat.toFixed(6)}_${googlePlace.geometry.location.lng.toFixed(6)}`;
+            let isDuplicate = false;
+
+            for (const [existingKey, existingPoint] of existingPositions) {
+              const distance = this.calculateDistance(
+                googlePlace.geometry.location.lat,
+                googlePlace.geometry.location.lng,
+                existingPoint.latitude,
+                existingPoint.longitude,
+              );
+
+              if (distance < 100) {
+                this.logger.debug(
+                  `Skipping Google Place "${googlePlace.name}" - too close to existing "${existingPoint.name}" (${distance}m)`,
+                );
+                isDuplicate = true;
+                break;
+              }
+            }
+
+            if (isDuplicate) continue;
+
+            // Convertir le lieu Google en PointOfInterest
+            const convertedPlace = this.googlePlacesService.convertToPointOfInterest(googlePlace);
+
+            const poiData = {
+              ...convertedPlace,
+              _id: new Types.ObjectId(),
+              id: new Types.ObjectId().toString(),
+              location: {
+                type: 'Point',
+                coordinates: [convertedPlace.longitude, convertedPlace.latitude],
+              },
+              userId: null,
+              isPublic: true,
+              isActive: true,
+              status: 'approved',
+              viewCount: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              metadata: {
+                ...convertedPlace.metadata,
+                source: 'googleplaces',
+              },
+            } as any;
+
+            finalResults.push(poiData);
+            existingPositions.set(posKey, poiData);
+            existingGooglePlaceIds.add(googlePlace.place_id);
+            googleCount++;
           }
 
-          // Créer un objet temporaire qui ressemble à un PointOfInterest
-          const poiData = {
-            _id: new Types.ObjectId(),
-            id: new Types.ObjectId().toString(),
-            name: osmPOI.name,
-            description: this.generateDescription(osmPOI),
-            latitude: osmPOI.lat,
-            longitude: osmPOI.lon,
-            location: {
-              type: 'Point',
-              coordinates: [osmPOI.lon, osmPOI.lat],
-            },
-            category,
-            address: {
-              formattedAddress:
-                osmPOI.tags['addr:full'] ||
-                `${osmPOI.tags['addr:street'] || ''} ${osmPOI.tags['addr:housenumber'] || ''}`.trim() ||
-                osmPOI.tags['addr:city'] ||
-                null,
-              street: osmPOI.tags['addr:street'] || null,
-              city: osmPOI.tags['addr:city'] || null,
-              postalCode: osmPOI.tags['addr:postcode'] || null,
-              country: osmPOI.tags['addr:country'] || null,
-            },
-            photos: [],
-            tags: this.extractTags(osmPOI),
-            statistics: {
-              averageRating: 0,
-              totalReviews: 0,
-              totalPhotos: 0,
-              totalLikes: 0,
-            },
-            metadata: {
-              source: 'openstreetmap',
-              osmId: osmPOI.id,
-              osmType: osmPOI.type,
-              osmTags: osmPOI.tags,
-              lastSync: new Date(),
-              imageUrl: osmPOI.tags['image_url'],
-              wikipedia: osmPOI.tags['wikipedia'],
-              wikidata: osmPOI.tags['wikidata'],
-              website: osmPOI.tags['website'],
-              openingHours: osmPOI.tags['opening_hours'],
-            },
-            userId: null,
-            isPublic: true,
-            isActive: true,
-            status: 'approved',
-            viewCount: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          } as any;
-
-          // Ajouter à la liste finale et à l'index des positions
-          finalResults.push(poiData);
-          existingPositions.set(posKey, poiData);
-          osmCount++;
+          this.logger.debug(`Added ${googleCount} unique POIs from Google Places`);
+        } catch (error) {
+          this.logger.error('Error fetching Google Places results:', error);
         }
+      }
 
-        this.logger.debug(`Added ${osmCount} unique POIs from OpenStreetMap`);
-      } catch (error) {
-        this.logger.error('Error fetching OSM results:', error);
+      // 2.2 Si on a encore de la place et qu'OSM est activé, compléter avec OSM
+      const remainingSlotsAfterGoogle = effectiveLimit - finalResults.length;
+
+      if (
+        remainingSlotsAfterGoogle > 0 &&
+        searchDto.includeOpenStreetMap !== false
+      ) {
+        this.logger.debug(
+          `Still ${remainingSlotsAfterGoogle} slots available, fetching from OSM`,
+        );
+
+        try {
+          // Utiliser le service Overpass pour récupérer des POIs OSM
+          const osmResults = await this.overpassService.searchPOIs(
+            searchDto.latitude,
+            searchDto.longitude,
+            searchDto.radius || 3, // Rayon en km
+            searchDto.categories?.map((cat) => cat.toLowerCase()),
+          );
+
+          // Filtrer les résultats OSM
+          for (const osmPOI of osmResults.data || []) {
+            if (finalResults.length >= effectiveLimit) break;
+
+            // Vérifier si ce POI OSM existe déjà
+            if (existingOsmIds.has(osmPOI.id)) {
+              this.logger.debug(
+                `Skipping OSM POI ${osmPOI.id} - already exists in MongoDB`,
+              );
+              continue;
+            }
+
+            // Vérifier si un POI existe déjà à cette position (tolérance de 100m)
+            const posKey = `${osmPOI.lat.toFixed(6)}_${osmPOI.lon.toFixed(6)}`;
+            let isDuplicate = false;
+
+            // Vérification plus stricte : chercher dans un rayon de 100m
+            for (const [existingKey, existingPoint] of existingPositions) {
+              const distance = this.calculateDistance(
+                osmPOI.lat,
+                osmPOI.lon,
+                existingPoint.latitude,
+                existingPoint.longitude,
+              );
+
+              if (distance < 100) {
+                // 100 mètres
+                this.logger.debug(
+                  `Skipping OSM POI "${osmPOI.name}" - too close to existing "${existingPoint.name}" (${distance}m)`,
+                );
+                isDuplicate = true;
+                break;
+              }
+            }
+
+            if (isDuplicate) continue;
+
+            // Mapper le type OSM vers nos catégories
+            const category = this.mapOSMTypeToCategory(osmPOI.type);
+
+            // Filtrer par catégorie si spécifiée
+            if (searchDto.categories && searchDto.categories.length > 0) {
+              const categoriesAsStrings = this.categoriesToStrings(
+                searchDto.categories,
+              );
+              if (!categoriesAsStrings?.includes(category)) {
+                continue;
+              }
+            }
+
+            // Créer un objet temporaire qui ressemble à un PointOfInterest
+            const poiData = {
+              _id: new Types.ObjectId(),
+              id: new Types.ObjectId().toString(),
+              name: osmPOI.name,
+              description: this.generateDescription(osmPOI),
+              latitude: osmPOI.lat,
+              longitude: osmPOI.lon,
+              location: {
+                type: 'Point',
+                coordinates: [osmPOI.lon, osmPOI.lat],
+              },
+              category,
+              address: {
+                formattedAddress:
+                  osmPOI.tags['addr:full'] ||
+                  `${osmPOI.tags['addr:street'] || ''} ${osmPOI.tags['addr:housenumber'] || ''}`.trim() ||
+                  osmPOI.tags['addr:city'] ||
+                  null,
+                street: osmPOI.tags['addr:street'] || null,
+                city: osmPOI.tags['addr:city'] || null,
+                postalCode: osmPOI.tags['addr:postcode'] || null,
+                country: osmPOI.tags['addr:country'] || null,
+              },
+              photos: [],
+              tags: this.extractTags(osmPOI),
+              statistics: {
+                averageRating: 0,
+                totalReviews: 0,
+                totalPhotos: 0,
+                totalLikes: 0,
+              },
+              metadata: {
+                source: 'openstreetmap',
+                osmId: osmPOI.id,
+                osmType: osmPOI.type,
+                osmTags: osmPOI.tags,
+                lastSync: new Date(),
+                imageUrl: osmPOI.tags['image_url'],
+                wikipedia: osmPOI.tags['wikipedia'],
+                wikidata: osmPOI.tags['wikidata'],
+                website: osmPOI.tags['website'],
+                openingHours: osmPOI.tags['opening_hours'],
+              },
+              userId: null,
+              isPublic: true,
+              isActive: true,
+              status: 'approved',
+              viewCount: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as any;
+
+            // Ajouter à la liste finale et à l'index des positions
+            finalResults.push(poiData);
+            existingPositions.set(posKey, poiData);
+            osmCount++;
+          }
+
+          this.logger.debug(`Added ${osmCount} unique POIs from OpenStreetMap`);
+        } catch (error) {
+          this.logger.error('Error fetching OSM results:', error);
+        }
       }
     }
 
     return {
       data: finalResults.slice(0, effectiveLimit),
-      total: mongoResults.total + osmCount,
+      total: mongoResults.total + osmCount + googleCount,
       page,
       limit: effectiveLimit,
       sources: {
         mongodb: mongoResults.data.length,
         openstreetmap: osmCount,
+        ...(googleCount > 0 && { googlePlaces: googleCount }),
       },
     };
   }

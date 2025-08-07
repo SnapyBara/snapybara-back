@@ -84,4 +84,94 @@ export class AuthService {
       isActive: mongoUser.isActive,
     };
   }
+
+  async loginWithSupabase(email: string, password: string): Promise<any> {
+    try {
+      // Sign in with Supabase
+      const { data, error } = await this.supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error || !data.user) {
+        this.logger.warn(`Login failed for ${email}: ${error?.message}`);
+        throw new UnauthorizedException('Invalid email or password');
+      }
+
+      // Get or sync user from MongoDB
+      let mongoUser = await this.usersService.findBySupabaseId(data.user.id);
+
+      if (!mongoUser) {
+        // If user doesn't exist in MongoDB, sync it
+        mongoUser = await this.usersService.syncWithSupabase(data.user);
+      }
+
+      // Update last login
+      if (mongoUser._id) {
+        await this.usersService.updateLastLogin(mongoUser._id.toString());
+      }
+
+      this.logger.log(`User logged in: ${mongoUser.username} (${mongoUser.email})`);
+
+      // Return the Supabase token and user info
+      return {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        token_type: 'Bearer',
+        expires_in: data.session.expires_in || 3600,
+        user: {
+          id: mongoUser._id?.toString(),
+          email: mongoUser.email,
+          role: mongoUser.role || 'user',
+          username: mongoUser.username,
+        },
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      this.logger.error('Login error:', error);
+      throw new UnauthorizedException('Authentication failed');
+    }
+  }
+
+  async refreshToken(refreshToken: string): Promise<any> {
+    try {
+      // Refresh the session with Supabase
+      const { data, error } = await this.supabase.auth.refreshSession({
+        refresh_token: refreshToken,
+      });
+
+      if (error || !data.session || !data.user) {
+        this.logger.warn(`Token refresh failed: ${error?.message}`);
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      // Get user from MongoDB
+      const mongoUser = await this.usersService.findBySupabaseId(data.user.id);
+
+      if (!mongoUser) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      return {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        token_type: 'Bearer',
+        expires_in: data.session.expires_in || 3600,
+        user: {
+          id: mongoUser._id?.toString(),
+          email: mongoUser.email,
+          role: mongoUser.role || 'user',
+          username: mongoUser.username,
+        },
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      this.logger.error('Token refresh error:', error);
+      throw new UnauthorizedException('Token refresh failed');
+    }
+  }
 }

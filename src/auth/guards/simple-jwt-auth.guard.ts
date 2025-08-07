@@ -3,21 +3,19 @@ import {
   ExecutionContext,
   UnauthorizedException,
   Logger,
-  Inject,
-  forwardRef,
+  CanActivate,
 } from '@nestjs/common';
-import { AuthService } from '../auth.service';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { AuthService } from '../auth.service';
 
 @Injectable()
-export class JwtAuthGuard {
-  private readonly logger = new Logger(JwtAuthGuard.name);
+export class SimpleJwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(SimpleJwtAuthGuard.name);
 
   constructor(
-    @Inject(forwardRef(() => AuthService))
-    private authService: AuthService,
-    private reflector: Reflector,
+    private readonly authService: AuthService,
+    private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -40,7 +38,7 @@ export class JwtAuthGuard {
     }
 
     try {
-      // Use our custom validation
+      // Validate token with Supabase
       const user = await this.authService.validateSupabaseToken(token);
       request.user = user;
       return true;
@@ -51,7 +49,12 @@ export class JwtAuthGuard {
   }
 
   private extractTokenFromHeader(request: any): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    const authorization = request.headers.authorization;
+    if (!authorization) {
+      return undefined;
+    }
+
+    const [type, token] = authorization.split(' ');
     return type === 'Bearer' ? token : undefined;
   }
 }

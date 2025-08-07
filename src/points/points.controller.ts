@@ -33,7 +33,7 @@ export class PointsController {
 
   @Post()
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new point of interest' })
   @ApiResponse({ status: 201, description: 'Point created successfully' })
   create(@Body() createPointDto: CreatePointOfInterestDto, @Request() req) {
@@ -42,7 +42,7 @@ export class PointsController {
 
   @Post('with-photos')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new point of interest with photos' })
   @ApiResponse({
     status: 201,
@@ -106,7 +106,7 @@ export class PointsController {
 
   @Patch(':id')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Update a point of interest' })
   @ApiResponse({ status: 200, description: 'Point updated successfully' })
   update(
@@ -119,7 +119,7 @@ export class PointsController {
 
   @Delete(':id')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Delete a point of interest' })
   @ApiResponse({ status: 200, description: 'Point deleted successfully' })
   remove(@Param('id') id: string, @Request() req) {
@@ -128,7 +128,7 @@ export class PointsController {
 
   @Get('search/app')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary:
       'App search: returns MongoDB data for all users, adds Google Places for premium users',
@@ -176,7 +176,12 @@ export class PointsController {
     },
   })
   searchHybrid(@Query() searchDto: SearchPointsDto) {
-    return this.pointsService.searchHybrid(searchDto);
+    // Par défaut, n'inclure que OpenStreetMap, pas Google Places
+    return this.pointsService.searchHybrid({
+      ...searchDto,
+      includeGooglePlaces: searchDto.includeGooglePlaces ?? false,
+      includeOpenStreetMap: searchDto.includeOpenStreetMap ?? true,
+    });
   }
 
   @Post('enrich-photos')
@@ -226,7 +231,7 @@ export class PointsController {
 
   @Post('import/google-places')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Import places from Google Places API in a geographic area',
   })

@@ -36,7 +36,7 @@ export class PhotosController {
 
   @Post()
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new photo entry' })
   @ApiResponse({ status: 201, description: 'Photo created successfully' })
   create(@Body() createPhotoDto: CreatePhotoDto, @Request() req) {
@@ -46,7 +46,7 @@ export class PhotosController {
   @Post('upload')
   @UseGuards(SupabaseAuthGuard)
   @UseInterceptors(FileInterceptor('photo'))
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Upload a photo file' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -139,7 +139,7 @@ export class PhotosController {
 
   @Patch(':id')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Update a photo' })
   @ApiResponse({ status: 200, description: 'Photo updated successfully' })
   update(
@@ -152,7 +152,7 @@ export class PhotosController {
 
   @Delete(':id')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Delete a photo' })
   @ApiResponse({ status: 200, description: 'Photo deleted successfully' })
   remove(@Param('id') id: string, @Request() req) {
@@ -161,7 +161,7 @@ export class PhotosController {
 
   @Post(':id/like')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Toggle like on a photo' })
   @ApiResponse({ status: 200, description: 'Like toggled successfully' })
   toggleLike(@Param('id') id: string, @Request() req) {

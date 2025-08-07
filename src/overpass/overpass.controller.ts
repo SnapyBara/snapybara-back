@@ -205,7 +205,7 @@ export class OverpassController {
 
   @Get('preload')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Preload POIs for a specific area (admin only)',
   })
@@ -229,7 +229,7 @@ export class OverpassController {
 
   @Get('preload-popular')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Preload popular Paris areas (admin only)',
   })
@@ -245,7 +245,7 @@ export class OverpassController {
 
   @Get('warm-cache')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Warm up the cache (admin only)',
   })
