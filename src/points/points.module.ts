@@ -10,6 +10,7 @@ import { GooglePlacesModule } from '../google-places/google-places.module';
 import { PhotosModule } from '../photos/photos.module';
 import { UploadModule } from '../upload/upload.module';
 import { OverpassModule } from '../overpass/overpass.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { OverpassModule } from '../overpass/overpass.module';
     PhotosModule,
     UploadModule,
     OverpassModule,
+    UsersModule,
   ],
   controllers: [PointsController],
   providers: [PointsService],

@@ -16,9 +16,11 @@ import {
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { SimpleJwtAuthGuard } from './guards/simple-jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Throttle } from '@nestjs/throttler';
+import { LoginDto, LoginResponseDto, RefreshTokenDto } from './dto/login.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -27,6 +29,67 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
   ) {}
+
+  @Post('login')
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 login attempts per minute
+  @ApiOperation({ 
+    summary: 'Login with email and password (for testing/development)',
+    description: 'Authenticates with Supabase and returns a JWT token'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Login successful',
+    type: LoginResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Invalid credentials',
+  })
+  async login(@Body() loginDto: LoginDto): Promise<LoginResponseDto> {
+    try {
+      // Authenticate with Supabase
+      const result = await this.authService.loginWithSupabase(
+        loginDto.email,
+        loginDto.password,
+      );
+
+      return result;
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Invalid credentials',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+  }
+
+  @Post('refresh')
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 refresh attempts per minute
+  @ApiOperation({ 
+    summary: 'Refresh access token',
+    description: 'Get a new access token using a refresh token'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Token refreshed successfully',
+    type: LoginResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Invalid refresh token',
+  })
+  async refreshToken(@Body() refreshDto: RefreshTokenDto): Promise<LoginResponseDto> {
+    try {
+      const result = await this.authService.refreshToken(refreshDto.refresh_token);
+      return result;
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Invalid refresh token',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+  }
 
   @Post('verify-token')
   @Public()
@@ -62,8 +125,8 @@ export class AuthController {
   }
 
   @Get('profile')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @UseGuards(SimpleJwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get authenticated user profile' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -87,8 +150,8 @@ export class AuthController {
   }
 
   @Post('refresh-user')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @UseGuards(SimpleJwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Refresh user data from Supabase' })
   async refreshUser(@CurrentUser() currentUser: any) {
     // This would typically re-sync user data with Supabase

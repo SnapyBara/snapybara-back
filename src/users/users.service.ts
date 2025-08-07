@@ -79,6 +79,13 @@ export class UsersService {
     return this.userModel.findOne({ supabaseId }).exec();
   }
 
+  async findByRole(roles: string[]): Promise<UserDocument[]> {
+    return this.userModel
+      .find({ role: { $in: roles }, isActive: true })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
   async update(
     id: string,
     updateUserDto: UpdateUserDto,
@@ -226,6 +233,22 @@ export class UsersService {
 
   async verifyEmail(id: string): Promise<UserDocument> {
     return this.update(id, { isEmailVerified: true } as UpdateUserDto);
+  }
+
+  async updateRole(id: string, role: string): Promise<UserDocument | null> {
+    const user = await this.userModel
+      .findByIdAndUpdate(
+        id,
+        { role, updatedAt: new Date() },
+        { new: true },
+      )
+      .exec();
+
+    if (user) {
+      this.logger.log(`User role updated: ${user.username} is now ${role}`);
+    }
+    
+    return user;
   }
 
   // ===== SUPABASE SYNC =====

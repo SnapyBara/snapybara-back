@@ -20,7 +20,7 @@ export class CollectionsController {
 
   @Post()
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new collection' })
   create(@Body() createCollectionDto: any, @Request() req) {
     return this.collectionsService.create(createCollectionDto, req.user.id);
@@ -45,7 +45,7 @@ export class CollectionsController {
 
   @Post(':id/points/:pointId')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Add a point to collection' })
   addPoint(
     @Param('id') id: string,
@@ -57,7 +57,7 @@ export class CollectionsController {
 
   @Delete(':id/points/:pointId')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Remove a point from collection' })
   removePoint(
     @Param('id') id: string,
@@ -69,7 +69,7 @@ export class CollectionsController {
 
   @Post(':id/follow')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Toggle follow on a collection' })
   toggleFollow(@Param('id') id: string, @Request() req) {
     return this.collectionsService.toggleFollow(id, req.user.id);

@@ -32,7 +32,7 @@ export class StatisticsController {
 
   @Get('me')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get current user statistics' })
   @ApiResponse({
     status: 200,

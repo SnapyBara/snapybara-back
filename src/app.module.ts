@@ -12,7 +12,6 @@ import { HealthModule } from './health/health.module';
 import { UsersModule } from './users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { DatabaseConfig } from './config/database.config';
-import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
 import { PointsModule } from './points/points.module';
 import { PhotosModule } from './photos/photos.module';
@@ -77,10 +76,6 @@ import { OverpassModule } from './overpass/overpass.module';
   controllers: [],
   providers: [
     DatabaseConfig,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

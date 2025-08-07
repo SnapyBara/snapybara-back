@@ -21,7 +21,7 @@ import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 @ApiTags('notifications')
 @Controller('notifications')
 @UseGuards(SupabaseAuthGuard)
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 

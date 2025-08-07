@@ -28,7 +28,7 @@ export class ReviewsController {
 
   @Post()
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new review' })
   @ApiResponse({ status: 201, description: 'Review created successfully' })
   @ApiResponse({ status: 409, description: 'User already reviewed this point' })
@@ -68,7 +68,7 @@ export class ReviewsController {
 
   @Patch(':id')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Update a review' })
   @ApiResponse({ status: 200, description: 'Review updated successfully' })
   update(
@@ -81,7 +81,7 @@ export class ReviewsController {
 
   @Delete(':id')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Delete a review' })
   @ApiResponse({ status: 200, description: 'Review deleted successfully' })
   remove(@Param('id') id: string, @Request() req) {
@@ -90,7 +90,7 @@ export class ReviewsController {
 
   @Post(':id/helpful')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Toggle helpful on a review' })
   @ApiResponse({ status: 200, description: 'Helpful toggled successfully' })
   toggleHelpful(@Param('id') id: string, @Request() req) {

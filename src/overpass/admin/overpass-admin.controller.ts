@@ -14,7 +14,7 @@ import { CacheService } from '../../cache/cache.service';
 @ApiTags('Overpass Admin')
 @Controller('admin/overpass')
 // @UseGuards(AdminGuard) // Uncomment to protect endpoints
-// @ApiBearerAuth()
+// @ApiBearerAuth('JWT-auth')
 export class OverpassAdminController {
   constructor(
     private readonly optimizedSearchService: OptimizedSearchService,

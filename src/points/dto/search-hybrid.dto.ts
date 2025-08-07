@@ -1,5 +1,6 @@
-import { IsNumber, IsOptional, IsBoolean, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsBoolean, IsString, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { POICategory } from './create-point.dto';
 
 export class SearchHybridDto {
   @ApiProperty()
@@ -20,6 +21,16 @@ export class SearchHybridDto {
   @IsBoolean()
   useGooglePlaces?: boolean;
 
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  includeOpenStreetMap?: boolean;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  includeGooglePlaces?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -34,4 +45,29 @@ export class SearchHybridDto {
   @IsOptional()
   @IsNumber()
   limit?: number;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  categories?: POICategory[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  minRating?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  hasPhotos?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsArray()
+  tags?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
 }

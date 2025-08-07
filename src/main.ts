@@ -18,6 +18,9 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:3005', // Port de l'admin React
+      'http://localhost:5173', // Vite dev server par défaut
+      'http://localhost:5174', // Port alternatif si 5173 est pris
       'http://10.37.0.14:3000',
       'http://10.37.0.15:3000',
     ],

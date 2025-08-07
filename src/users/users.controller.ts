@@ -24,9 +24,11 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToClass } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SimpleJwtAuthGuard } from '../auth/guards/simple-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { OwnerGuard } from '../auth/guards/owner.guard';
 import { Public } from '../auth/decorators/public.decorator';
@@ -36,8 +38,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @ApiTags('users')
 @Controller('users')
 @UseInterceptors(ClassSerializerInterceptor)
-@UseGuards(JwtAuthGuard, RolesGuard)
-@ApiBearerAuth()
+@UseGuards(SimpleJwtAuthGuard, RolesGuard)
+@ApiBearerAuth('JWT-auth')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -62,6 +64,18 @@ export class UsersController {
   @ApiOperation({ summary: 'Get list of users (admin only)' })
   async findAll(@Query('limit') limit = 50, @Query('skip') skip = 0) {
     const users = await this.usersService.findAll(+limit, +skip);
+    return users.map((user) =>
+      plainToClass(UserResponseDto, user.toObject(), {
+        excludeExtraneousValues: true,
+      }),
+    );
+  }
+
+  @Get('moderators')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Get list of moderators and admins (admin only)' })
+  async getModerators() {
+    const users = await this.usersService.findByRole(['moderator', 'admin']);
     return users.map((user) =>
       plainToClass(UserResponseDto, user.toObject(), {
         excludeExtraneousValues: true,
@@ -267,6 +281,45 @@ export class UsersController {
   })
   async deactivateAccount(@Param('id') id: string) {
     const user = await this.usersService.deactivate(id);
+    return plainToClass(UserResponseDto, user.toObject(), {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Patch(':id/role')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Update user role (admin only)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User role successfully updated',
+    type: UserResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only admins can update user roles',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'User not found',
+  })
+  async updateUserRole(
+    @Param('id') id: string,
+    @Body() updateRoleDto: UpdateRoleDto,
+    @CurrentUser() currentUser: any,
+  ) {
+    // Prevent admin from changing their own role
+    if (id === currentUser.mongoId) {
+      throw new HttpException(
+        'You cannot change your own role',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const user = await this.usersService.updateRole(id, updateRoleDto.role);
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
     return plainToClass(UserResponseDto, user.toObject(), {
       excludeExtraneousValues: true,
     });
