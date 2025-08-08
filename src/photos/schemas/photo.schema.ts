@@ -26,6 +26,18 @@ export class Photo {
   mediumUrl?: string;
 
   @Prop()
+  largeUrl?: string;
+
+  @Prop()
+  filename?: string;
+
+  @Prop()
+  originalName?: string;
+
+  @Prop()
+  mimeType?: string;
+
+  @Prop()
   caption?: string;
 
   @Prop({ default: true })

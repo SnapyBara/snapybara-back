@@ -6,14 +6,16 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Photo, PhotoDocument } from './schemas/photo.schema';
-import { CreatePhotoDto } from './dto/create-photo.dto';
+import { CreatePhotoDto, UploadPhotoDto } from './dto/create-photo.dto';
 import { UpdatePhotoDto } from './dto/update-photo.dto';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class PhotosService {
   constructor(
     @InjectModel(Photo.name)
     private photoModel: Model<PhotoDocument>,
+    private uploadService: UploadService,
   ) {}
 
   async create(
@@ -195,5 +197,59 @@ export class PhotosService {
       .populate('userId', 'username profilePicture')
       .populate('pointId', 'name category')
       .exec();
+  }
+
+  async findByPoint(pointId: string): Promise<Photo[]> {
+    if (!Types.ObjectId.isValid(pointId)) {
+      throw new BadRequestException('Invalid point ID');
+    }
+
+    return this.photoModel
+      .find({ 
+        pointId: new Types.ObjectId(pointId),
+        isActive: true,
+        status: 'approved'
+      })
+      .sort({ createdAt: -1 })
+      .populate('userId', 'username profilePicture')
+      .exec();
+  }
+
+  async uploadPhoto(
+    file: Express.Multer.File,
+    uploadPhotoDto: UploadPhotoDto,
+    userId: string,
+  ): Promise<Photo> {
+    // Upload the file
+    const uploadedFile = await this.uploadService.uploadImage(file);
+
+    // Create photo document
+    const photoData = {
+      url: uploadedFile.originalUrl,
+      thumbnailUrl: uploadedFile.thumbnailUrl,
+      mediumUrl: uploadedFile.mediumUrl,
+      largeUrl: uploadedFile.largeUrl,
+      filename: uploadedFile.filename,
+      originalName: uploadedFile.originalName,
+      size: uploadedFile.size,
+      mimeType: uploadedFile.mimeType,
+      width: uploadedFile.width,
+      height: uploadedFile.height,
+      pointId: uploadPhotoDto.pointId ? new Types.ObjectId(uploadPhotoDto.pointId) : undefined,
+      caption: uploadPhotoDto.caption,
+      tags: uploadPhotoDto.tags || [],
+      isPublic: uploadPhotoDto.isPublic !== false,
+      userId: new Types.ObjectId(userId),
+      status: 'approved', // Auto-approve for now, can add moderation later
+    };
+
+    try {
+      const createdPhoto = new this.photoModel(photoData);
+      return await createdPhoto.save();
+    } catch (error) {
+      // If save fails, delete the uploaded files
+      await this.uploadService.deleteImage(uploadedFile.filename);
+      throw error;
+    }
   }
 }

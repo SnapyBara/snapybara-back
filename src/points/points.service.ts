@@ -166,7 +166,7 @@ export class PointsService {
               stream: null as any,
             };
 
-            photoData = await this.uploadService.uploadPhoto(file, supabaseUserId);
+            photoData = await this.uploadService.uploadImage(file);
           } else if (photoDto.imageData.startsWith('http')) {
             const response = await fetch(photoDto.imageData);
             const arrayBuffer = await response.arrayBuffer();
@@ -188,7 +188,7 @@ export class PointsService {
               stream: null as any,
             };
 
-            photoData = await this.uploadService.uploadPhoto(file, supabaseUserId);
+            photoData = await this.uploadService.uploadImage(file);
           } else {
             throw new BadRequestException('Invalid image data format');
           }
@@ -1327,5 +1327,299 @@ export class PointsService {
     }
 
     return result;
+  }
+
+  /**
+   * Get all pending points for moderation
+   */
+  async getPendingPoints(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: PointOfInterest[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.pointModel
+        .find({ status: 'pending' })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('userId', 'username profilePicture email')
+        .exec(),
+      this.pointModel.countDocuments({ status: 'pending' }),
+    ]);
+
+    return { data, total, page, limit };
+  }
+
+  /**
+   * Get all points with admin filtering options
+   */
+  async getAllPointsAdmin(filters: {
+    page: number;
+    limit: number;
+    status?: string;
+    category?: string;
+    search?: string;
+  }): Promise<{
+    data: PointOfInterest[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const { page = 1, limit = 20, status, category, search } = filters;
+    const skip = (page - 1) * limit;
+
+    const query: any = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (category) {
+      query.category = category;
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.pointModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('userId', 'username profilePicture email')
+        .exec(),
+      this.pointModel.countDocuments(query),
+    ]);
+
+    return { data, total, page, limit };
+  }
+
+  /**
+   * Update point status (approve/reject)
+   */
+  async updatePointStatus(
+    id: string,
+    status: 'approved' | 'rejected',
+    adminUserId: string,
+    reason?: string,
+  ): Promise<PointOfInterest> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid point ID');
+    }
+
+    const point = await this.pointModel.findById(id);
+    if (!point) {
+      throw new NotFoundException('Point not found');
+    }
+
+    const updateData: any = {
+      status,
+      updatedAt: new Date(),
+    };
+
+    if (status === 'rejected' && reason) {
+      updateData['metadata.rejectionReason'] = reason;
+      updateData['metadata.rejectedBy'] = adminUserId;
+      updateData['metadata.rejectedAt'] = new Date();
+    } else if (status === 'approved') {
+      updateData['metadata.approvedBy'] = adminUserId;
+      updateData['metadata.approvedAt'] = new Date();
+    }
+
+    const updated = await this.pointModel
+      .findByIdAndUpdate(id, updateData, { new: true })
+      .populate('userId', 'username profilePicture')
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException('Point not found');
+    }
+
+    // TODO: Send notification to user about status change
+
+    return updated;
+  }
+
+  /**
+   * Delete a point permanently (admin only)
+   */
+  async adminDeletePoint(id: string, adminUserId: string): Promise<void> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid point ID');
+    }
+
+    const point = await this.pointModel.findById(id);
+    if (!point) {
+      throw new NotFoundException('Point not found');
+    }
+
+    // TODO: Delete associated photos and reviews
+
+    await this.pointModel.findByIdAndDelete(id);
+
+    this.logger.log(
+      `Point ${id} permanently deleted by admin ${adminUserId}`,
+    );
+  }
+
+  /**
+   * Get moderation statistics for dashboard
+   */
+  async getModerationStats(): Promise<{
+    pendingCount: number;
+    approvedToday: number;
+    rejectedToday: number;
+    totalPOIs: number;
+    activeUsers: number;
+    recentSubmissions: any[];
+  }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Get counts
+    const [
+      pendingCount,
+      approvedToday,
+      rejectedToday,
+      totalPOIs,
+      recentSubmissions,
+    ] = await Promise.all([
+      // Points en attente
+      this.pointModel.countDocuments({ status: 'pending' }),
+      
+      // Points approuvés aujourd'hui
+      this.pointModel.countDocuments({
+        status: 'approved',
+        'metadata.approvedAt': {
+          $gte: today,
+          $lt: tomorrow,
+        },
+      }),
+      
+      // Points rejetés aujourd'hui
+      this.pointModel.countDocuments({
+        status: 'rejected',
+        'metadata.rejectedAt': {
+          $gte: today,
+          $lt: tomorrow,
+        },
+      }),
+      
+      // Total des points actifs
+      this.pointModel.countDocuments({ isActive: true }),
+      
+      // 5 dernières soumissions
+      this.pointModel
+        .find({ status: 'pending' })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate('userId', 'username email')
+        .select('name createdAt userId')
+        .exec(),
+    ]);
+
+    // Count active users (ceux qui ont soumis des points dans les 30 derniers jours)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const activeUsers = await this.pointModel.distinct('userId', {
+      createdAt: { $gte: thirtyDaysAgo },
+    });
+
+    return {
+      pendingCount,
+      approvedToday,
+      rejectedToday,
+      totalPOIs,
+      activeUsers: activeUsers.length,
+      recentSubmissions: recentSubmissions.map(submission => ({
+        id: submission._id,
+        name: submission.name,
+        submittedBy: submission.userId
+          ? {
+              username: (submission.userId as any).username,
+              email: (submission.userId as any).email,
+            }
+          : null,
+        createdAt: submission.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * Get all photos for a specific point
+   */
+  async getPointPhotos(pointId: string): Promise<any[]> {
+    if (!Types.ObjectId.isValid(pointId)) {
+      throw new BadRequestException('Invalid point ID');
+    }
+
+    // Vérifier que le point existe
+    const point = await this.pointModel.findById(pointId);
+    if (!point) {
+      throw new NotFoundException('Point not found');
+    }
+
+    // Récupérer toutes les photos associées à ce point
+    const photos = await this.photosService.findByPoint(pointId);
+    
+    return photos;
+  }
+
+  /**
+   * Upload a photo for a specific point
+   */
+  async uploadPhotoForPoint(
+    pointId: string,
+    file: Express.Multer.File,
+    photoData: { caption?: string; tags?: string[] },
+    supabaseUserId: string,
+  ): Promise<Photo> {
+    // Vérifier que le point existe
+    const point = await this.findOne(pointId);
+    if (!point) {
+      throw new NotFoundException('Point not found');
+    }
+
+    // Trouver l'utilisateur MongoDB à partir du supabaseId
+    const user = await this.usersService.findBySupabaseId(supabaseUserId);
+    if (!user || !user._id) {
+      throw new BadRequestException('User not found');
+    }
+
+    // Upload la photo via le service photos
+    const uploadedPhoto = await this.photosService.uploadPhoto(
+      file,
+      {
+        pointId: pointId,
+        caption: photoData.caption,
+        tags: photoData.tags || [],
+        isPublic: true,
+      },
+      user._id.toString(), // Utiliser l'ID MongoDB de l'utilisateur
+    );
+
+    // Mettre à jour les statistiques du point
+    await this.pointModel.findByIdAndUpdate(pointId, {
+      $inc: { 'statistics.totalPhotos': 1 },
+    });
+
+    return uploadedPhoto;
   }
 }

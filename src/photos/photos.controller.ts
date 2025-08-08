@@ -88,13 +88,7 @@ export class PhotosController {
     @Body() uploadPhotoDto: UploadPhotoDto,
     @Request() req,
   ) {
-    // Validate the file and upload it
-    return {
-      message: 'Photo upload endpoint - implement storage integration',
-      file: file.originalname,
-      size: file.size,
-      mimetype: file.mimetype,
-    };
+    return this.photosService.uploadPhoto(file, uploadPhotoDto, req.user.id);
   }
 
   @Get()
