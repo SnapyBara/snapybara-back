@@ -15,16 +15,12 @@ export class CollectionsService {
   ) {}
 
   async create(createCollectionDto: any, userId: string): Promise<Collection> {
-    console.log('create - createCollectionDto:', JSON.stringify(createCollectionDto));
-    console.log('create - userId:', userId);
-    
-    // Si on reçoit seulement un pointId, on l'ajoute à la collection par défaut
+
     if (createCollectionDto.pointId && !createCollectionDto.name) {
       console.log('Adding to default collection with pointId:', createCollectionDto.pointId);
       return this.addToDefaultCollection(createCollectionDto.pointId, userId);
     }
 
-    // Sinon, on crée une nouvelle collection
     const createdCollection = new this.collectionModel({
       ...createCollectionDto,
       userId: userId,
@@ -33,10 +29,7 @@ export class CollectionsService {
   }
 
   async addToDefaultCollection(pointId: string, userId: string): Promise<Collection> {
-    console.log('addToDefaultCollection - pointId:', pointId, 'type:', typeof pointId, 'length:', pointId?.length);
-    console.log('addToDefaultCollection - userId:', userId);
-    
-    // Vérifier que le pointId est valide
+
     if (!Types.ObjectId.isValid(pointId)) {
       console.log('pointId is invalid:', pointId);
       throw new BadRequestException('Invalid point ID');

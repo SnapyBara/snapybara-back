@@ -17,10 +17,10 @@ import { AuthModule } from '../auth/auth.module';
         host: configService.get('REDIS_HOST', 'localhost'),
         port: configService.get('REDIS_PORT', 6379),
         password: configService.get('REDIS_PASSWORD'),
-        ttl: 3600, // TTL par défaut: 1 heure
+        ttl: 3600,
       }),
     }),
-    AuthModule, // Import du AuthModule pour résoudre les dépendances du SimpleJwtAuthGuard
+    AuthModule,
   ],
   controllers: [CacheController],
   providers: [CacheService],

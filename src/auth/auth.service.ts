@@ -41,11 +41,9 @@ export class AuthService {
       let mongoUser = await this.usersService.findBySupabaseId(user.id);
 
       if (!mongoUser) {
-        // If user doesn't exist in MongoDB, sync it
         mongoUser = await this.usersService.syncWithSupabase(user);
       }
 
-      // Update last login
       if (mongoUser._id) {
         await this.usersService.updateLastLogin(mongoUser._id.toString());
       }
@@ -98,22 +96,18 @@ export class AuthService {
         throw new UnauthorizedException('Invalid email or password');
       }
 
-      // Get or sync user from MongoDB
       let mongoUser = await this.usersService.findBySupabaseId(data.user.id);
 
       if (!mongoUser) {
-        // If user doesn't exist in MongoDB, sync it
         mongoUser = await this.usersService.syncWithSupabase(data.user);
       }
 
-      // Update last login
       if (mongoUser._id) {
         await this.usersService.updateLastLogin(mongoUser._id.toString());
       }
 
       this.logger.log(`User logged in: ${mongoUser.username} (${mongoUser.email})`);
 
-      // Return the Supabase token and user info
       return {
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
@@ -137,7 +131,6 @@ export class AuthService {
 
   async refreshToken(refreshToken: string): Promise<any> {
     try {
-      // Refresh the session with Supabase
       const { data, error } = await this.supabase.auth.refreshSession({
         refresh_token: refreshToken,
       });
@@ -147,7 +140,6 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      // Get user from MongoDB
       const mongoUser = await this.usersService.findBySupabaseId(data.user.id);
 
       if (!mongoUser) {
@@ -172,6 +164,57 @@ export class AuthService {
       }
       this.logger.error('Token refresh error:', error);
       throw new UnauthorizedException('Token refresh failed');
+    }
+  }
+
+  async validateUser(email: string): Promise<any> {
+    return { email };
+  }
+
+  async generateToken(user: any) {
+    const payload = { email: user.email, sub: user.id };
+    return {
+      access_token: this.jwtService.sign(payload),
+    };
+  }
+
+  async generateSupabaseCompatibleToken(user: any) {
+    // Générer un token JWT avec les claims Supabase
+    const payload = {
+      sub: user.id, // Supabase user ID
+      email: user.email,
+      role: 'authenticated',
+      aud: 'authenticated',
+      iss: this.configService.get<string>('SUPABASE_URL') + '/auth/v1',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+    };
+
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('SUPABASE_JWT_SECRET'),
+    });
+
+    // Pour le refresh token, on peut utiliser un token plus long
+    const refreshPayload = {
+      ...payload,
+      exp: Math.floor(Date.now() / 1000) + 604800, // 7 days
+    };
+
+    const refreshToken = this.jwtService.sign(refreshPayload, {
+      secret: this.configService.get<string>('SUPABASE_JWT_SECRET'),
+    });
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    };
+  }
+
+  async verifyToken(token: string) {
+    try {
+      return this.jwtService.verify(token);
+    } catch (error) {
+      return null;
     }
   }
 }
