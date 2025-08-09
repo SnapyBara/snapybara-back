@@ -24,10 +24,11 @@ export class SupabaseAuthGuard implements CanActivate {
     console.log('Token extracted:', token.substring(0, 20) + '...');
 
     try {
+      // Option 1: Utiliser le service admin pour valider le token
       const {
         data: { user },
         error,
-      } = await this.supabaseService.getClient().auth.getUser(token);
+      } = await this.supabaseService.getAdminClient().auth.getUser(token);
 
       console.log('Supabase response - User:', user);
       console.log('Supabase response - Error:', error);

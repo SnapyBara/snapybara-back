@@ -10,8 +10,8 @@ export type CollectionDocument = Collection & Document;
 export class Collection {
   _id?: Types.ObjectId;
 
-  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
-  userId: Types.ObjectId;
+  @Prop({ required: true, type: String }) // UUID de Supabase
+  userId: string;
 
   @Prop({ required: true })
   name: string;
@@ -22,6 +22,9 @@ export class Collection {
   @Prop({ default: true })
   isPublic: boolean;
 
+  @Prop({ default: false })
+  isDefault?: boolean;
+
   @Prop()
   coverPhotoUrl?: string;
 
@@ -31,8 +34,8 @@ export class Collection {
   @Prop({ default: 0 })
   pointsCount: number;
 
-  @Prop({ type: [Types.ObjectId], ref: 'User', default: [] })
-  followers: Types.ObjectId[];
+  @Prop({ type: [String], default: [] }) // UUIDs de Supabase
+  followers: string[];
 
   @Prop({ default: 0 })
   followersCount: number;

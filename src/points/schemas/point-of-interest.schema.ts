@@ -97,6 +97,24 @@ export class PointOfInterest {
   @Prop({ type: Object })
   metadata?: Record<string, any>;
 
+  @Prop()
+  bestTimeToVisit?: string;
+
+  @Prop()
+  photographyTips?: string;
+
+  @Prop()
+  accessibilityInfo?: string;
+
+  @Prop({ default: 'easy', enum: ['easy', 'moderate', 'difficult'] })
+  difficulty?: string;
+
+  @Prop({ default: true })
+  isFreeAccess?: boolean;
+
+  @Prop({ default: false })
+  requiresPermission?: boolean;
+
   @Prop({ default: Date.now })
   createdAt: Date;
 

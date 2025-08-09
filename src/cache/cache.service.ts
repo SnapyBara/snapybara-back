@@ -3,15 +3,14 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 
 export interface CacheOptions {
-  ttl?: number; // Time to live en secondes
-  prefix?: string; // Préfixe pour la clé
+  ttl?: number;
+  prefix?: string;
 }
 
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);
 
-  // Préfixes pour organiser le cache
   private readonly PREFIXES = {
     GOOGLE_PLACES_SEARCH: 'gp:search:',
     GOOGLE_PLACES_DETAILS: 'gp:details:',
@@ -24,21 +23,20 @@ export class CacheService {
     OVERPASS_NOMINATIM: 'overpass:nominatim:',
   };
 
-  // TTL par défaut pour chaque type de cache (en secondes)
   private readonly DEFAULT_TTL = {
-    SEARCH: 3600, // 1 heure
-    DETAILS: 86400, // 24 heures
-    PHOTOS: 604800, // 7 jours
-    AUTOCOMPLETE: 1800, // 30 minutes
-    OVERPASS_SEARCH: 7200, // 2 heures pour Overpass (changements moins fréquents)
-    OVERPASS_AREA: 10800, // 3 heures pour les zones prédéfinies
-    OVERPASS_NOMINATIM: 3600, // 1 heure pour Nominatim
+    SEARCH: 3600,
+    DETAILS: 86400,
+    PHOTOS: 604800,
+    AUTOCOMPLETE: 1800,
+    OVERPASS_SEARCH: 7200,
+    OVERPASS_AREA: 10800,
+    OVERPASS_NOMINATIM: 3600,
   };
 
   constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
   /**
-   * Obtenir une valeur du cache
+   * Get cache value
    */
   async get<T>(key: string): Promise<T | undefined> {
     try {
@@ -56,7 +54,7 @@ export class CacheService {
   }
 
   /**
-   * Définir une valeur dans le cache
+   * Define value in cache
    */
   async set(key: string, value: any, options?: CacheOptions): Promise<void> {
     try {
@@ -69,7 +67,7 @@ export class CacheService {
   }
 
   /**
-   * Supprimer une valeur du cache
+   * Delete other value on cache
    */
   async del(key: string): Promise<void> {
     try {
@@ -85,17 +83,14 @@ export class CacheService {
    */
   async reset(): Promise<void> {
     try {
-      // Pour cache-manager v4, on doit utiliser del avec pattern
-      // ou implémenter une logique personnalisée
       this.logger.warn('Cache RESET - Method not available in this version');
-      // Alternative: garder une liste des clés et les supprimer une par une
     } catch (error) {
       this.logger.error('Error resetting cache:', error);
     }
   }
 
   /**
-   * Générer une clé de cache pour les recherches Google Places
+   * Generate key for POI google palce in cache
    */
   generateGooglePlacesSearchKey(params: {
     latitude: number;
@@ -116,9 +111,6 @@ export class CacheService {
     return key;
   }
 
-  /**
-   * Générer une clé de cache pour les recherches de texte Google Places
-   */
   generateGooglePlacesTextSearchKey(params: {
     query: string;
     latitude?: number;
@@ -139,7 +131,7 @@ export class CacheService {
   }
 
   /**
-   * Générer une clé de cache pour l'autocomplétion
+   * autocompletion
    */
   generateAutocompleteKey(params: {
     input: string;
@@ -158,45 +150,34 @@ export class CacheService {
     return key;
   }
 
-  /**
-   * Générer une clé de cache pour les détails d'un lieu
-   */
+
   generatePlaceDetailsKey(placeId: string): string {
     return `${this.PREFIXES.GOOGLE_PLACES_DETAILS}${placeId}`;
   }
 
-  /**
-   * Générer une clé de cache pour les photos
-   */
   generatePhotoKey(photoReference: string, maxWidth: number): string {
     return `${this.PREFIXES.GOOGLE_PLACES_PHOTOS}${photoReference}:${maxWidth}`;
   }
 
-  /**
-   * Obtenir ou calculer une valeur (pattern cache-aside)
-   */
   async getOrSet<T>(
     key: string,
     factory: () => Promise<T>,
     options?: CacheOptions,
   ): Promise<T> {
-    // Essayer de récupérer du cache
     const cached = await this.get<T>(key);
     if (cached !== undefined) {
       return cached;
     }
 
-    // Si pas en cache, calculer la valeur
     const value = await factory();
 
-    // Mettre en cache pour la prochaine fois
     await this.set(key, value, options);
 
     return value;
   }
 
   /**
-   * Invalider le cache pour une zone géographique
+   * Stop request for a zone that exist in cache
    */
   async invalidateAreaCache(
     latitude: number,
@@ -210,14 +191,13 @@ export class CacheService {
   }
 
   /**
-   * Obtenir les statistiques du cache
+   * Obtain statistique
    */
   async getStats(): Promise<{
     hits: number;
     misses: number;
     hitRate: number;
   }> {
-    // TODO: Implémenter les statistiques si nécessaire
     return {
       hits: 0,
       misses: 0,
@@ -226,7 +206,7 @@ export class CacheService {
   }
 
   /**
-   * Générer une clé de cache pour les recherches Overpass
+   * Generate key cache for Overpass api
    */
   generateOverpassSearchKey(params: {
     latitude: number;
@@ -235,7 +215,6 @@ export class CacheService {
     categories?: string[];
   }): string {
     const { latitude, longitude, radius, categories } = params;
-    // Arrondir à 3 décimales pour grouper les recherches proches
     const lat = Math.round(latitude * 1000) / 1000;
     const lng = Math.round(longitude * 1000) / 1000;
 
@@ -247,19 +226,12 @@ export class CacheService {
     return key;
   }
 
-  /**
-   * Générer une clé de cache pour les zones Overpass
-   */
   generateOverpassAreaKey(lat: number, lon: number, radiusKm: number): string {
-    // Arrondir à 2 décimales pour les zones (moins de précision nécessaire)
     const roundedLat = Math.round(lat * 100) / 100;
     const roundedLon = Math.round(lon * 100) / 100;
     return `${this.PREFIXES.OVERPASS_AREA}${roundedLat},${roundedLon},${radiusKm}`;
   }
 
-  /**
-   * Générer une clé de cache pour Nominatim
-   */
   generateNominatimKey(
     category: string,
     bounds: {
@@ -273,9 +245,6 @@ export class CacheService {
     return `${this.PREFIXES.OVERPASS_NOMINATIM}${category}:${minLat.toFixed(2)},${minLon.toFixed(2)},${maxLat.toFixed(2)},${maxLon.toFixed(2)}`;
   }
 
-  /**
-   * Vérifier si une zone est déjà en cache avec une marge
-   */
   async hasNearbyCache(
     lat: number,
     lon: number,
@@ -307,32 +276,28 @@ export class CacheService {
   }
 
   /**
-   * Cache intelligent avec vérification de fraîcheur
+   * Intelligent cache
    */
   async getOrSetWithFreshness<T>(
     key: string,
     factory: () => Promise<T>,
     options?: CacheOptions & {
-      maxAge?: number; // Age maximum acceptable en secondes
-      fallbackOnError?: boolean; // Utiliser le cache expiré si erreur
+      maxAge?: number;
+      fallbackOnError?: boolean;
     },
   ): Promise<T> {
     try {
-      // Essayer de récupérer du cache
       const cached = await this.get<T>(key);
       if (cached !== undefined) {
         return cached;
       }
 
-      // Si pas en cache, calculer la valeur
       const value = await factory();
 
-      // Mettre en cache pour la prochaine fois
       await this.set(key, value, options);
 
       return value;
     } catch (error) {
-      // Si fallback activé et qu'on a une valeur en cache (même expirée)
       if (options?.fallbackOnError) {
         const cached = await this.get<T>(key);
         if (cached !== undefined) {
@@ -345,7 +310,7 @@ export class CacheService {
   }
 
   /**
-   * Nettoyer les entrées de cache expirées
+   * Clean expire entry
    */
   async cleanup(): Promise<void> {
     this.logger.log('Cache cleanup requested');
@@ -354,7 +319,7 @@ export class CacheService {
   }
 
   /**
-   * Obtenir les métriques du cache
+   * Obtain cache metrics
    */
   getMetrics(): {
     type: string;
@@ -362,9 +327,9 @@ export class CacheService {
     entries?: number;
   } {
     return {
-      type: 'memory', // or 'redis' depending on implementation
+      type: 'memory',
       status: 'active',
-      // entries count would require cache provider support
+
     };
   }
 }

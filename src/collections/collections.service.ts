@@ -15,11 +15,56 @@ export class CollectionsService {
   ) {}
 
   async create(createCollectionDto: any, userId: string): Promise<Collection> {
+
+    if (createCollectionDto.pointId && !createCollectionDto.name) {
+      console.log('Adding to default collection with pointId:', createCollectionDto.pointId);
+      return this.addToDefaultCollection(createCollectionDto.pointId, userId);
+    }
+
     const createdCollection = new this.collectionModel({
       ...createCollectionDto,
-      userId: new Types.ObjectId(userId),
+      userId: userId,
     });
     return createdCollection.save();
+  }
+
+  async addToDefaultCollection(pointId: string, userId: string): Promise<Collection> {
+
+    if (!Types.ObjectId.isValid(pointId)) {
+      console.log('pointId is invalid:', pointId);
+      throw new BadRequestException('Invalid point ID');
+    }
+
+    // Chercher ou créer la collection par défaut "Mes favoris"
+    let defaultCollection = await this.collectionModel.findOne({
+      userId: userId,
+      name: 'Mes favoris',
+      isDefault: true,
+    });
+
+    if (!defaultCollection) {
+      // Créer la collection par défaut si elle n'existe pas
+      defaultCollection = new this.collectionModel({
+        userId: userId,
+        name: 'Mes favoris',
+        description: 'Ma collection de points favoris',
+        isPublic: false,
+        isDefault: true,
+        points: [new Types.ObjectId(pointId)],
+        pointsCount: 1,
+      });
+      return defaultCollection.save();
+    }
+
+    // Ajouter le point à la collection existante
+    const pointObjectId = new Types.ObjectId(pointId);
+    if (!defaultCollection.points.some((p) => p.equals(pointObjectId))) {
+      defaultCollection.points.push(pointObjectId);
+      defaultCollection.pointsCount = defaultCollection.points.length;
+      await defaultCollection.save();
+    }
+
+    return defaultCollection;
   }
 
   async findAll(filters: {
@@ -39,7 +84,7 @@ export class CollectionsService {
     const query: any = { isActive: true };
 
     if (queryFilters.userId) {
-      query.userId = new Types.ObjectId(queryFilters.userId);
+      query.userId = queryFilters.userId;
     }
 
     if (queryFilters.isPublic !== undefined) {
@@ -129,6 +174,44 @@ export class CollectionsService {
     return collection;
   }
 
+  async isPointInUserCollections(pointId: string, userId: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(pointId)) {
+      throw new BadRequestException('Invalid point ID');
+    }
+
+    const collection = await this.collectionModel.findOne({
+      userId: userId,
+      points: new Types.ObjectId(pointId),
+      isActive: true,
+    });
+
+    return !!collection;
+  }
+
+  async removeFromDefaultCollection(pointId: string, userId: string): Promise<void> {
+    if (!Types.ObjectId.isValid(pointId)) {
+      throw new BadRequestException('Invalid point ID');
+    }
+
+    // Chercher la collection par défaut
+    const defaultCollection = await this.collectionModel.findOne({
+      userId: userId,
+      name: 'Mes favoris',
+      isDefault: true,
+    });
+
+    if (!defaultCollection) {
+      throw new NotFoundException('Default collection not found');
+    }
+
+    // Retirer le point
+    defaultCollection.points = defaultCollection.points.filter(
+      (p) => !p.equals(new Types.ObjectId(pointId)),
+    );
+    defaultCollection.pointsCount = defaultCollection.points.length;
+    await defaultCollection.save();
+  }
+
   async toggleFollow(
     collectionId: string,
     userId: string,
@@ -139,20 +222,17 @@ export class CollectionsService {
       throw new NotFoundException('Collection not found');
     }
 
-    const userObjectId = new Types.ObjectId(userId);
-    const isFollowing = collection.followers.some((f) =>
-      f.equals(userObjectId),
-    );
+    const isFollowing = collection.followers.includes(userId);
 
     if (isFollowing) {
       await this.collectionModel.findByIdAndUpdate(collectionId, {
-        $pull: { followers: userObjectId },
+        $pull: { followers: userId },
         $inc: { followersCount: -1 },
       });
       return { following: false, count: collection.followersCount - 1 };
     } else {
       await this.collectionModel.findByIdAndUpdate(collectionId, {
-        $addToSet: { followers: userObjectId },
+        $addToSet: { followers: userId },
         $inc: { followersCount: 1 },
       });
       return { following: true, count: collection.followersCount + 1 };

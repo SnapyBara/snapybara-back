@@ -26,7 +26,6 @@ export class CacheController {
       'WARNING: Clears all cached data (not available in this cache-manager version)',
   })
   async resetCache() {
-    // La méthode reset n'est pas disponible dans cette version de cache-manager
     return {
       message: 'Cache reset not available in this version',
       suggestion: 'Use specific cache key deletion instead',

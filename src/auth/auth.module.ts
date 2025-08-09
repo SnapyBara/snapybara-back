@@ -22,15 +22,23 @@ import { UsersModule } from '../users/users.module';
       }),
       inject: [ConfigService],
     }),
-    forwardRef(() => UsersModule), // Utilisation de forwardRef pour éviter la dépendance circulaire
+    forwardRef(() => UsersModule),
   ],
   controllers: [AuthController],
   providers: [
     AuthService, 
-    JwtStrategy
+    JwtStrategy,
+    JwtAuthGuard,
+    SimpleJwtAuthGuard,
+    RolesGuard,
+    OwnerGuard
   ],
   exports: [
-    AuthService
+    AuthService,
+    JwtAuthGuard,
+    SimpleJwtAuthGuard,
+    RolesGuard,
+    OwnerGuard
   ],
 })
 export class AuthModule {}

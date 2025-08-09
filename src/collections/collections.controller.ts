@@ -67,6 +67,22 @@ export class CollectionsController {
     return this.collectionsService.removePoint(id, pointId, req.user.id);
   }
 
+  @Get('points/:pointId')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Check if a point is in user collections' })
+  async isPointInCollection(@Param('pointId') pointId: string, @Request() req) {
+    return this.collectionsService.isPointInUserCollections(pointId, req.user.id);
+  }
+
+  @Delete('points/:pointId')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Remove a point from user default collection' })
+  async removeFromCollection(@Param('pointId') pointId: string, @Request() req) {
+    return this.collectionsService.removeFromDefaultCollection(pointId, req.user.id);
+  }
+
   @Post(':id/follow')
   @UseGuards(SupabaseAuthGuard)
   @ApiBearerAuth('JWT-auth')

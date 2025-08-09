@@ -3,18 +3,23 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Review, ReviewDocument } from './schemas/review.schema';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { PointsService } from '../points/points.service';
 
 @Injectable()
 export class ReviewsService {
   constructor(
     @InjectModel(Review.name)
     private reviewModel: Model<ReviewDocument>,
+    @Inject(forwardRef(() => PointsService))
+    private pointsService: PointsService,
   ) {}
 
   async create(
@@ -23,7 +28,7 @@ export class ReviewsService {
   ): Promise<Review> {
     // Check if user already reviewed this point
     const existingReview = await this.reviewModel.findOne({
-      userId: new Types.ObjectId(userId),
+      userId: userId,
       pointId: new Types.ObjectId(createReviewDto.pointId),
     });
 
@@ -33,11 +38,29 @@ export class ReviewsService {
 
     const createdReview = new this.reviewModel({
       ...createReviewDto,
-      userId: new Types.ObjectId(userId),
+      userId: userId,
       pointId: new Types.ObjectId(createReviewDto.pointId),
     });
 
-    return createdReview.save();
+    const savedReview = await createdReview.save();
+
+    // Mettre à jour les statistiques du point
+    await this.updatePointStatistics(createReviewDto.pointId);
+
+    return savedReview;
+  }
+
+  private async updatePointStatistics(pointId: string): Promise<void> {
+    try {
+      const stats = await this.getPointStatistics(pointId);
+      await this.pointsService.updatePointStatistics(pointId, {
+        averageRating: stats.averageRating,
+        totalReviews: stats.totalReviews,
+      });
+    } catch (error) {
+      console.error('Error updating point statistics:', error);
+      // Ne pas faire échouer l'ajout de la review si la mise à jour des stats échoue
+    }
   }
 
   async findAll(filters: {
@@ -61,7 +84,7 @@ export class ReviewsService {
     }
 
     if (queryFilters.userId) {
-      query.userId = new Types.ObjectId(queryFilters.userId);
+      query.userId = queryFilters.userId;
     }
 
     const [data, total] = await Promise.all([
@@ -110,7 +133,7 @@ export class ReviewsService {
       throw new NotFoundException('Review not found');
     }
 
-    if (review.userId.toString() !== userId) {
+    if (review.userId !== userId) {
       throw new BadRequestException('You can only update your own reviews');
     }
 
@@ -139,7 +162,7 @@ export class ReviewsService {
       throw new NotFoundException('Review not found');
     }
 
-    if (review.userId.toString() !== userId) {
+    if (review.userId !== userId) {
       throw new BadRequestException('You can only delete your own reviews');
     }
 
@@ -162,18 +185,17 @@ export class ReviewsService {
       throw new NotFoundException('Review not found');
     }
 
-    const userObjectId = new Types.ObjectId(userId);
-    const isHelpful = review.helpfulBy.some((id) => id.equals(userObjectId));
+    const isHelpful = review.helpfulBy.includes(userId);
 
     if (isHelpful) {
       await this.reviewModel.findByIdAndUpdate(reviewId, {
-        $pull: { helpfulBy: userObjectId },
+        $pull: { helpfulBy: userId },
         $inc: { helpfulCount: -1 },
       });
       return { helpful: false, count: review.helpfulCount - 1 };
     } else {
       await this.reviewModel.findByIdAndUpdate(reviewId, {
-        $addToSet: { helpfulBy: userObjectId },
+        $addToSet: { helpfulBy: userId },
         $inc: { helpfulCount: 1 },
       });
       return { helpful: true, count: review.helpfulCount + 1 };
