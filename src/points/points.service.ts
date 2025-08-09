@@ -115,15 +115,15 @@ export class PointsService {
         isPublic: createPointWithPhotosDto.isPublic ?? true,
         tags: createPointWithPhotosDto.tags || [],
         address: createPointWithPhotosDto.address,
+        bestTimeToVisit: createPointWithPhotosDto.bestTimeToVisit,
+        photographyTips: createPointWithPhotosDto.photographyTips,
+        accessibilityInfo: createPointWithPhotosDto.accessibilityInfo,
+        difficulty: createPointWithPhotosDto.difficulty,
+        isFreeAccess: createPointWithPhotosDto.isFreeAccess,
+        requiresPermission: createPointWithPhotosDto.requiresPermission,
         metadata: {
           ...createPointWithPhotosDto.metadata,
           googlePlaceId: createPointWithPhotosDto.googlePlaceId,
-          bestTimeToVisit: createPointWithPhotosDto.bestTimeToVisit,
-          accessibilityInfo: createPointWithPhotosDto.accessibilityInfo,
-          photographyTips: createPointWithPhotosDto.photographyTips,
-          isFreeAccess: createPointWithPhotosDto.isFreeAccess,
-          requiresPermission: createPointWithPhotosDto.requiresPermission,
-          difficulty: createPointWithPhotosDto.difficulty,
         },
         statistics: {
           averageRating: 0,
@@ -600,6 +600,33 @@ export class PointsService {
   async updateStatistics(pointId: string): Promise<void> {
     // This would be called after adding/removing photos or reviews
     // Implementation would calculate and update statistics
+  }
+
+  /**
+   * Mettre à jour les statistiques d'un point après l'ajout d'une review
+   */
+  async updatePointStatistics(
+    pointId: string,
+    stats: { averageRating: number; totalReviews: number },
+  ): Promise<void> {
+    if (!Types.ObjectId.isValid(pointId)) {
+      throw new BadRequestException('Invalid point ID');
+    }
+
+    await this.pointModel.findByIdAndUpdate(
+      pointId,
+      {
+        $set: {
+          'statistics.averageRating': stats.averageRating,
+          'statistics.totalReviews': stats.totalReviews,
+        },
+      },
+      { new: true },
+    );
+
+    this.logger.debug(
+      `Updated statistics for point ${pointId}: rating=${stats.averageRating}, reviews=${stats.totalReviews}`,
+    );
   }
 
   async findNearby(

@@ -11,6 +11,7 @@ import { PhotosModule } from '../photos/photos.module';
 import { UploadModule } from '../upload/upload.module';
 import { OverpassModule } from '../overpass/overpass.module';
 import { UsersModule } from '../users/users.module';
+import { ReviewsModule } from '../reviews/reviews.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { UsersModule } from '../users/users.module';
     UploadModule,
     OverpassModule,
     UsersModule,
+    ReviewsModule,
   ],
   controllers: [PointsController],
   providers: [PointsService],

@@ -161,6 +161,37 @@ export class CreatePointDto {
   @IsArray()
   @IsString({ each: true })
   photos?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  bestTimeToVisit?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  photographyTips?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  accessibilityInfo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @IsEnum(['easy', 'moderate', 'difficult'])
+  difficulty?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isFreeAccess?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  requiresPermission?: boolean;
 }
 
 // Alias pour la compatibilité avec l'ancien nom

@@ -10,8 +10,8 @@ export type ReviewDocument = Review & Document;
 export class Review {
   _id?: Types.ObjectId;
 
-  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
-  userId: Types.ObjectId;
+  @Prop({ required: true, type: String }) // UUID de Supabase
+  userId: string;
 
   @Prop({ required: true, type: Types.ObjectId, ref: 'PointOfInterest' })
   pointId: Types.ObjectId;
@@ -49,8 +49,8 @@ export class Review {
   @Prop({ default: 0 })
   helpfulCount: number;
 
-  @Prop({ type: [Types.ObjectId], ref: 'User', default: [] })
-  helpfulBy: Types.ObjectId[];
+  @Prop({ type: [String], default: [] }) // UUIDs de Supabase
+  helpfulBy: string[];
 
   @Prop({ type: [String], default: [] })
   photos: string[];

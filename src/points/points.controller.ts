@@ -34,6 +34,7 @@ import { ImportGooglePlacesDto } from './dto/import-google-places.dto';
 import { CreatePointWithPhotosDto } from './dto/create-point-with-photos.dto';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { PhotosService } from '../photos/photos.service';
+import { ReviewsService } from '../reviews/reviews.service';
 
 @ApiTags('points')
 @Controller('points')
@@ -41,6 +42,7 @@ export class PointsController {
   constructor(
     private readonly pointsService: PointsService,
     private readonly photosService: PhotosService,
+    private readonly reviewsService: ReviewsService,
   ) {}
 
   @Post()
@@ -461,5 +463,48 @@ export class PointsController {
       },
       req.user.id,
     );
+  }
+
+  @Get(':id/reviews')
+  @ApiOperation({ summary: 'Get reviews for a specific point' })
+  @ApiResponse({
+    status: 200,
+    description: 'Reviews retrieved successfully',
+  })
+  async getPointReviews(@Param('id') id: string) {
+    console.log('Getting reviews for point:', id);
+    const result = await this.reviewsService.findAll({ pointId: id });
+    console.log('Found reviews:', result.data.length);
+    return result;
+  }
+
+  @Post(':id/reviews')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Add a review to a specific point' })
+  @ApiResponse({
+    status: 201,
+    description: 'Review created successfully',
+  })
+  async addPointReview(
+    @Param('id') id: string,
+    @Body() body: { rating: number; comment: string },
+    @Request() req,
+  ) {
+    console.log('Creating review for point:', id);
+    console.log('Review data:', body);
+    console.log('User ID:', req.user.id);
+    
+    const result = await this.reviewsService.create(
+      {
+        pointId: id,
+        rating: body.rating,
+        comment: body.comment,
+      },
+      req.user.id,
+    );
+    
+    console.log('Review created:', result);
+    return result;
   }
 }
