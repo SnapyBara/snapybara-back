@@ -16,7 +16,6 @@ export class UsersService {
 
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
-  // ===== CRUD BASIQUE =====
 
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
     try {
@@ -43,7 +42,6 @@ export class UsersService {
       return savedUser;
     } catch (error) {
       if (error.code === 11000) {
-        // MongoDB duplicate key error
         throw new ConflictException('Utilisateur déjà existant');
       }
       throw error;
@@ -65,10 +63,6 @@ export class UsersService {
       throw new NotFoundException('Utilisateur non trouvé');
     }
     return user;
-  }
-
-  async findByEmail(email: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ email, isActive: true }).exec();
   }
 
   async findByUsername(username: string): Promise<UserDocument | null> {
@@ -135,8 +129,6 @@ export class UsersService {
   async addPoints(id: string, points: number): Promise<UserDocument> {
     const user = await this.findOne(id);
     const newPoints = user.points + points;
-
-    // Calculate new level based on updated points
     const newLevel = this.calculateLevel(newPoints);
 
     const updatedUser = await this.update(id, {
@@ -169,29 +161,28 @@ export class UsersService {
     return user;
   }
 
-  async incrementPhotoCount(id: string): Promise<UserDocument> {
-    const user = await this.findOne(id);
-    return this.update(id, { photosUploaded: user.photosUploaded + 1 });
-  }
+  // async incrementPhotoCount(id: string): Promise<UserDocument> {
+  //   const user = await this.findOne(id);
+  //   return this.update(id, { photosUploaded: user.photosUploaded + 1 });
+  // }
+  //
+  // async incrementPOICount(id: string): Promise<UserDocument> {
+  //   const user = await this.findOne(id);
+  //   return this.update(id, {
+  //     pointsOfInterestCreated: user.pointsOfInterestCreated + 1,
+  //   });
+  // }
+  //
+  // async incrementCommentCount(id: string): Promise<UserDocument> {
+  //   const user = await this.findOne(id);
+  //   return this.update(id, { commentsWritten: user.commentsWritten + 1 });
+  // }
+  //
+  // async incrementLikesReceived(id: string): Promise<UserDocument> {
+  //   const user = await this.findOne(id);
+  //   return this.update(id, { likesReceived: user.likesReceived + 1 });
+  // }
 
-  async incrementPOICount(id: string): Promise<UserDocument> {
-    const user = await this.findOne(id);
-    return this.update(id, {
-      pointsOfInterestCreated: user.pointsOfInterestCreated + 1,
-    });
-  }
-
-  async incrementCommentCount(id: string): Promise<UserDocument> {
-    const user = await this.findOne(id);
-    return this.update(id, { commentsWritten: user.commentsWritten + 1 });
-  }
-
-  async incrementLikesReceived(id: string): Promise<UserDocument> {
-    const user = await this.findOne(id);
-    return this.update(id, { likesReceived: user.likesReceived + 1 });
-  }
-
-  // ===== CLASSEMENTS =====
 
   async getLeaderboard(limit = 10): Promise<UserDocument[]> {
     return this.userModel
@@ -201,21 +192,21 @@ export class UsersService {
       .exec();
   }
 
-  async getUserRank(id: string): Promise<{ rank: number; total: number }> {
-    const user = await this.findOne(id);
-    const rank =
-      (await this.userModel.countDocuments({
-        isActive: true,
-        $or: [
-          { points: { $gt: user.points } },
-          { points: user.points, level: { $gt: user.level } },
-          { points: user.points, level: user.level, _id: { $lt: user._id } },
-        ],
-      })) + 1;
-
-    const total = await this.userModel.countDocuments({ isActive: true });
-    return { rank, total };
-  }
+  // async getUserRank(id: string): Promise<{ rank: number; total: number }> {
+  //   const user = await this.findOne(id);
+  //   const rank =
+  //     (await this.userModel.countDocuments({
+  //       isActive: true,
+  //       $or: [
+  //         { points: { $gt: user.points } },
+  //         { points: user.points, level: { $gt: user.level } },
+  //         { points: user.points, level: user.level, _id: { $lt: user._id } },
+  //       ],
+  //     })) + 1;
+  //
+  //   const total = await this.userModel.countDocuments({ isActive: true });
+  //   return { rank, total };
+  // }
 
   // ===== Manage statement =====
 
@@ -225,14 +216,6 @@ export class UsersService {
 
   async deactivate(id: string): Promise<UserDocument> {
     return this.update(id, { isActive: false } as UpdateUserDto);
-  }
-
-  async activate(id: string): Promise<UserDocument> {
-    return this.update(id, { isActive: true } as UpdateUserDto);
-  }
-
-  async verifyEmail(id: string): Promise<UserDocument> {
-    return this.update(id, { isEmailVerified: true } as UpdateUserDto);
   }
 
   async updateRole(id: string, role: string): Promise<UserDocument | null> {
@@ -298,7 +281,7 @@ export class UsersService {
     }
   }
 
-  // ===== MÉTHODES UTILITAIRES =====
+  // ===== UTILS =====
 
   private calculateLevel(points: number): number {
     // Niveau 1: 0-99 points, Niveau 2: 100-299, Niveau 3: 300-599, etc.
@@ -308,7 +291,6 @@ export class UsersService {
     if (points < 1000) return 4;
     if (points < 1500) return 5;
 
-    // Au-delà de 1500, chaque 500 points = +1 niveau
     return Math.floor((points - 1500) / 500) + 6;
   }
 
@@ -319,7 +301,6 @@ export class UsersService {
       ?.substring(0, 15);
 
     if (!baseUsername) {
-      // Fallback : use email part before @
       baseUsername = supabaseUser.email
         .split('@')[0]
         .toLowerCase()

@@ -186,20 +186,21 @@ export function calculateUserLevel(totalPoints: number): number {
  * Calcule les points nécessaires pour le prochain niveau
  */
 export function getPointsForNextLevel(currentPoints: number): number {
-  const currentLevel = calculateUserLevel(currentPoints);
-  const nextLevel = currentLevel + 1;
-
   // Points requis pour chaque niveau
   const levelThresholds = [
     0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600, 4500, 5500,
   ];
-
-  if (nextLevel <= 10) {
-    return levelThresholds[nextLevel] - currentPoints;
+  
+  // Trouver le prochain seuil
+  for (let i = 1; i < levelThresholds.length; i++) {
+    if (currentPoints < levelThresholds[i]) {
+      return levelThresholds[i] - currentPoints;
+    }
   }
 
   // Pour les niveaux > 10
-  const nextLevelThreshold = 5500 + (nextLevel - 10) * 1000;
+  const currentLevel = calculateUserLevel(currentPoints);
+  const nextLevelThreshold = 5500 + (currentLevel - 9) * 1000;
   return nextLevelThreshold - currentPoints;
 }
 

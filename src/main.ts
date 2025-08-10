@@ -4,8 +4,20 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as path from 'path';
+import * as Sentry from '@sentry/node';
 
 async function bootstrap() {
+  // Initialize Sentry
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+    integrations: [
+      Sentry.httpIntegration(),
+      Sentry.expressIntegration(),
+    ],
+  });
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Serve static files for uploads

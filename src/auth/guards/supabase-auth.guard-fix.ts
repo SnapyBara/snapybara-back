@@ -14,7 +14,6 @@ export class SupabaseAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
-    console.log('Auth Header:', authHeader);
 
     if (!authHeader) {
       throw new UnauthorizedException('No authorization header');
@@ -24,7 +23,6 @@ export class SupabaseAuthGuard implements CanActivate {
     console.log('Token extracted:', token.substring(0, 20) + '...');
 
     try {
-      // Option 1: Utiliser le service admin pour valider le token
       const {
         data: { user },
         error,

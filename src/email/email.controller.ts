@@ -8,7 +8,7 @@ export class EmailController {
   constructor(private readonly emailService: EmailService) {}
 
   @Post('send-confirmation')
-  @Public() // ✅ Route publique
+  @Public()
   async sendEmailConfirmation(@Body() body: { email: string }) {
     return await this.emailService.sendEmailConfirmation(body.email);
   }
@@ -27,9 +27,6 @@ export class EmailController {
     @Res() res: Response,
   ) {
     try {
-      console.log('=== DÉBUT CONFIRMATION EMAIL ===');
-      console.log('🔍 URL complète:', req.url);
-      console.log('🔍 Query params reçus:', query);
 
       const userAgent = req.headers['user-agent'] ?? '';
       const isMobile =
@@ -51,15 +48,12 @@ export class EmailController {
       } = query;
 
       if (supabaseError) {
-        console.log('❌ Erreur de confirmation Supabase:', supabaseError);
-        console.log('   Description:', _error_description);
+        console.log('error', _error_description);
         return res.status(400).send(this.getErrorPage());
       }
 
       if (confirmed === 'true') {
-        console.log('✅ Confirmation réussie via paramètre confirmed');
         if (isMobile) {
-          console.log('📱 Mobile détecté → Redirection vers app');
           return res.redirect('snapybara://auth/email-confirmed');
         }
         return res.send(this.getSuccessPage(isMobile));
@@ -67,23 +61,16 @@ export class EmailController {
 
       if (token || token_hash) {
         const tokenToVerify = token || token_hash;
-        console.log(
-          '🔍 Tentative de vérification du token depuis template email:',
-          tokenToVerify.substring(0, 10) + '...',
-        );
 
         try {
           const isValid =
             await this.emailService.confirmEmailWithSupabase(tokenToVerify);
           if (isValid) {
-            console.log('✅ Token vérifié avec succès depuis template email');
             if (isMobile) {
-              console.log('📱 Mobile détecté → Redirection vers app');
               return res.redirect('snapybara://auth/email-confirmed');
             }
             return res.send(this.getSuccessPage(isMobile));
           } else {
-            console.log('❌ Token invalide ou expiré');
             return res.status(400).send(this.getErrorPage());
           }
         } catch (error) {
@@ -93,27 +80,21 @@ export class EmailController {
       }
 
       if (access_token && refresh_token) {
-        console.log("✅ Confirmation réussie - Tokens d'accès reçus");
         if (isMobile) {
-          console.log('📱 Mobile détecté → Redirection vers app');
           return res.redirect('snapybara://auth/email-confirmed');
         }
         return res.send(this.getSuccessPage(isMobile));
       }
 
       if (access_token) {
-        console.log('✅ Confirmation réussie - Access token seul');
         if (isMobile) {
-          console.log('📱 Mobile détecté → Redirection vers app');
           return res.redirect('snapybara://auth/email-confirmed');
         }
         return res.send(this.getSuccessPage(isMobile));
       }
 
       if (type === 'signup' || type === 'email') {
-        console.log('✅ Redirection de confirmation basique, type:', type);
         if (isMobile) {
-          console.log('📱 Mobile détecté → Redirection vers app');
           return res.redirect('snapybara://auth/email-confirmed');
         }
         return res.send(this.getSuccessPage(isMobile));
@@ -124,22 +105,19 @@ export class EmailController {
       );
       return res.send(this.getFragmentReaderPage(isMobile));
     } catch (error) {
-      console.error('💥 Erreur lors du traitement de la confirmation:', error);
       return res.status(500).send(this.getErrorPage());
     } finally {
-      console.log('=== FIN CONFIRMATION EMAIL ===');
     }
   }
 
   @Get('reset-password')
-  @Public() // ✅ Route publique pour reset password
+  @Public()
   resetPassword(
     @Query() query: any,
     @Req() req: Request,
     @Res() res: Response,
   ) {
     try {
-      console.log('🔍 Reset password - Query params reçus:', query);
 
       const userAgent = req.headers['user-agent'] || '';
       const isMobile =
@@ -159,28 +137,21 @@ export class EmailController {
         error_description,
       } = query;
 
-      // Gestion des erreurs
       if (supabaseError) {
-        console.log('❌ Erreur de reset password Supabase:', supabaseError);
         return res.status(400).send(this.getResetPasswordErrorPage());
       }
 
       if (token || token_hash) {
-        console.log('✅ Token de reset password détecté');
-
         const supabaseUrl = process.env.SUPABASE_URL;
         const baseUrl = req.protocol + '://' + req.get('host');
         const redirectUrl = `${supabaseUrl}/auth/v1/verify?token=${encodeURIComponent(token || token_hash)}&type=recovery&redirect_to=${encodeURIComponent(baseUrl + '/email/reset-password-form')}`;
 
-        console.log('🔄 Redirection vers Supabase:', redirectUrl);
         return res.redirect(redirectUrl);
       }
 
       if (access_token && refresh_token) {
-        console.log('✅ Tokens reçus, affichage du formulaire');
 
         if (isMobile) {
-          console.log('📱 Mobile détecté → Redirection vers app avec tokens');
           const appUrl = `snapybara://auth/password-reset?access_token=${encodeURIComponent(access_token)}&refresh_token=${encodeURIComponent(refresh_token)}`;
           return res.redirect(appUrl);
         }
@@ -189,19 +160,16 @@ export class EmailController {
           this.getResetPasswordForm(access_token, refresh_token, expires_in),
         );
       }
-
-      console.log('⚠️ Aucun token détecté');
       return res.status(400).send(this.getResetPasswordErrorPage());
     } catch (error) {
-      console.error('💥 Erreur lors du traitement du reset password:', error);
+      console.error('Error on reset password:', error);
       return res.status(500).send(this.getResetPasswordErrorPage());
     }
   }
 
   @Get('reset-password-form')
-  @Public() // ✅ Route publique pour le formulaire
+  @Public()
   resetPasswordForm(@Query() query: any, @Res() res: Response) {
-    console.log('🔍 Reset password form - Query params reçus:', query);
 
     const {
       access_token,
@@ -213,7 +181,7 @@ export class EmailController {
 
     if (error) {
       console.log(
-        '❌ Erreur dans reset-password-form:',
+        'error in reset-password-form:',
         error,
         error_description,
       );
@@ -226,20 +194,16 @@ export class EmailController {
     }
 
     if (!access_token) {
-      console.log(
-        '⚠️ Pas de tokens dans query, utilisation du fragment reader',
-      );
       return res.send(this.getResetPasswordFragmentReader());
     }
 
-    console.log('✅ Tokens trouvés dans query, affichage du formulaire');
     return res.send(
       this.getResetPasswordForm(access_token, refresh_token, expires_in),
     );
   }
 
   @Get('reset-password-error')
-  @Public() // ✅ Route publique pour les erreurs
+  @Public()
   resetPasswordError(@Res() res: Response) {
     return res.status(400).send(this.getResetPasswordErrorPage());
   }
@@ -526,7 +490,6 @@ export class EmailController {
             const fragment = window.location.hash.substring(1);
             const params = new URLSearchParams(fragment);
             
-            console.log('Fragment détecté:', fragment);
             
             const accessToken = params.get('access_token');
             const error = params.get('error');
@@ -539,7 +502,6 @@ export class EmailController {
             }
             
             if (accessToken || type === 'signup') {
-              console.log('Confirmation réussie détectée');
               showSuccess();
               return;
             }
@@ -1022,10 +984,8 @@ export class EmailController {
           const errorMessage = document.getElementById('error-message');
           const successMessage = document.getElementById('success-message');
 
-          // Établir la session automatiquement
           window.addEventListener('load', async () => {
             try {
-              console.log('Établissement de la session...');
               
               const { data, error } = await supabase.auth.setSession({
                 access_token: accessToken,
@@ -1213,12 +1173,9 @@ export class EmailController {
         
         <script>
           function parseFragmentAndRedirect() {
-            console.log('🔍 Lecture du fragment URL...');
             const fragment = window.location.hash.substring(1);
-            console.log('Fragment détecté:', fragment);
             
             if (!fragment) {
-              console.log('❌ Aucun fragment trouvé');
               window.location.href = '/email/reset-password-error';
               return;
             }
@@ -1240,15 +1197,12 @@ export class EmailController {
             });
             
             if (error) {
-              console.log('❌ Erreur dans le fragment:', error);
               window.location.href = '/email/reset-password-error';
               return;
             }
             
             if (accessToken && type === 'recovery') {
-              console.log('✅ Token de recovery trouvé, redirection vers formulaire...');
               
-              // Construire l'URL avec les paramètres en query string
               const queryParams = new URLSearchParams({
                 access_token: accessToken,
                 refresh_token: refreshToken || '',
@@ -1257,19 +1211,15 @@ export class EmailController {
               });
               
               const redirectUrl = '/email/reset-password-form?' + queryParams.toString();
-              console.log('🔄 Redirection vers:', redirectUrl);
               
               window.location.href = redirectUrl;
             } else {
-              console.log('❌ Tokens manquants ou type incorrect');
               window.location.href = '/email/reset-password-error';
             }
           }
           
-          // Lancer la redirection au chargement
           window.addEventListener('load', parseFragmentAndRedirect);
           
-          // Fallback au cas où load ne se déclenche pas
           setTimeout(parseFragmentAndRedirect, 1000);
         </script>
       </body>

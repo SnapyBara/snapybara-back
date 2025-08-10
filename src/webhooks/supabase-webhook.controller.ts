@@ -56,6 +56,11 @@ export class SupabaseWebhookController {
 
       return { success: true, message: 'Webhook processed successfully' };
     } catch (error) {
+      // Re-throw HTTP exceptions as-is
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      
       this.logger.error('Webhook processing failed:', error);
       throw new HttpException(
         'Webhook processing failed',
