@@ -53,7 +53,6 @@ export class PointsService {
     createPointDto: CreatePointOfInterestDto,
     supabaseUserId: string,
   ): Promise<PointOfInterest> {
-    // Trouver l'utilisateur MongoDB à partir du supabaseId
     const user = await this.usersService.findBySupabaseId(supabaseUserId);
     if (!user || !user._id) {
       throw new BadRequestException('User not found');
@@ -87,7 +86,6 @@ export class PointsService {
     point: PointOfInterest;
     photos: Photo[];
   }> {
-    // Trouver l'utilisateur MongoDB à partir du supabaseId
     const user = await this.usersService.findBySupabaseId(supabaseUserId);
     if (!user || !user._id) {
       throw new BadRequestException('User not found');
@@ -110,7 +108,7 @@ export class PointsService {
           ],
         },
         category: createPointWithPhotosDto.category,
-        userId: user._id, // Utiliser l'ObjectId MongoDB
+        userId: user._id,
         status: 'pending',
         isPublic: createPointWithPhotosDto.isPublic ?? true,
         tags: createPointWithPhotosDto.tags || [],
@@ -153,18 +151,14 @@ export class PointsService {
             const imageBuffer = Buffer.from(matches[2], 'base64');
             const mimeType = `image/${matches[1]}`;
 
-            const file: Express.Multer.File = {
+            const file = {
               buffer: imageBuffer,
               mimetype: mimeType,
               originalname: `photo-${Date.now()}.${matches[1]}`,
               size: imageBuffer.length,
               fieldname: 'photo',
               encoding: '7bit',
-              destination: '',
-              filename: '',
-              path: '',
-              stream: null as any,
-            };
+            } as Express.Multer.File;
 
             photoData = await this.uploadService.uploadImage(file);
           } else if (photoDto.imageData.startsWith('http')) {
@@ -175,18 +169,14 @@ export class PointsService {
             const contentType =
               response.headers.get('content-type') || 'image/jpeg';
 
-            const file: Express.Multer.File = {
+            const file = {
               buffer,
               mimetype: contentType,
               originalname: `photo-${Date.now()}.jpg`,
               size: buffer.length,
               fieldname: 'photo',
               encoding: '7bit',
-              destination: '',
-              filename: '',
-              path: '',
-              stream: null as any,
-            };
+            } as Express.Multer.File;
 
             photoData = await this.uploadService.uploadImage(file);
           } else {
@@ -272,10 +262,8 @@ export class PointsService {
     const { page = 1, limit = 20, ...filters } = searchDto;
     const skip = (page - 1) * limit;
 
-    // Convertir les catégories enum en strings pour MongoDB
     const categoriesAsStrings = this.categoriesToStrings(filters.categories);
 
-    // Si on a une recherche géographique, utiliser l'agrégation avec $geoNear
     if (filters.latitude && filters.longitude && filters.radius) {
       const pipeline: any[] = [
         {
@@ -292,7 +280,6 @@ export class PointsService {
         },
       ];
 
-      // Ajouter les filtres dans le $match après $geoNear
       const matchConditions: any = {};
 
       if (categoriesAsStrings && categoriesAsStrings.length > 0) {
@@ -325,7 +312,6 @@ export class PointsService {
         pipeline.push({ $match: matchConditions });
       }
 
-      // Ajouter le tri
       let sortField: any = {};
       switch (filters.sortBy) {
         case 'rating':
@@ -338,19 +324,15 @@ export class PointsService {
           sortField = { viewCount: -1 };
           break;
         default:
-          // Par défaut, trier par distance (déjà fait par $geoNear)
           sortField = { distance: 1 };
       }
 
       if (Object.keys(sortField).length > 0 && filters.sortBy !== 'distance') {
         pipeline.push({ $sort: sortField });
       }
-
-      // Ajouter la pagination
       pipeline.push({ $skip: skip });
       pipeline.push({ $limit: limit });
 
-      // Ajouter le lookup pour populate userId
       pipeline.push({
         $lookup: {
           from: 'users',
@@ -667,7 +649,7 @@ export class PointsService {
     this.logger.debug(
       `SearchHybrid called with includeGooglePlaces=${searchDto.includeGooglePlaces}, includeOpenStreetMap=${searchDto.includeOpenStreetMap}`,
     );
-    
+
     const { page = 1, limit = 20 } = searchDto;
 
     // Limiter à 200 points maximum pour avoir un bon équilibre performance/complétude
@@ -1529,7 +1511,7 @@ export class PointsService {
     ] = await Promise.all([
       // Points en attente
       this.pointModel.countDocuments({ status: 'pending' }),
-      
+
       // Points approuvés aujourd'hui
       this.pointModel.countDocuments({
         status: 'approved',
@@ -1538,7 +1520,7 @@ export class PointsService {
           $lt: tomorrow,
         },
       }),
-      
+
       // Points rejetés aujourd'hui
       this.pointModel.countDocuments({
         status: 'rejected',
@@ -1547,10 +1529,10 @@ export class PointsService {
           $lt: tomorrow,
         },
       }),
-      
+
       // Total des points actifs
       this.pointModel.countDocuments({ isActive: true }),
-      
+
       // 5 dernières soumissions
       this.pointModel
         .find({ status: 'pending' })
@@ -1564,7 +1546,7 @@ export class PointsService {
     // Count active users (ceux qui ont soumis des points dans les 30 derniers jours)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     const activeUsers = await this.pointModel.distinct('userId', {
       createdAt: { $gte: thirtyDaysAgo },
     });
@@ -1605,7 +1587,7 @@ export class PointsService {
 
     // Récupérer toutes les photos associées à ce point
     const photos = await this.photosService.findByPoint(pointId);
-    
+
     return photos;
   }
 

@@ -20,6 +20,13 @@ describe('PointsController', () => {
     update: jest.fn(),
     remove: jest.fn(),
     searchHybrid: jest.fn(),
+    uploadPhotoForPoint: jest.fn(),
+    createWithPhotos: jest.fn(),
+    importFromGooglePlaces: jest.fn(),
+    findByUser: jest.fn(),
+    getPointPhotos: jest.fn(),
+    getPendingPoints: jest.fn(),
+    updatePointStatus: jest.fn(),
   };
 
   const mockPhotosService = {
@@ -191,6 +198,258 @@ describe('PointsController', () => {
       expect(mockPointsService.remove).toHaveBeenCalledWith(
         pointId,
         'test-user-id',
+      );
+    });
+  });
+
+  describe('findOne', () => {
+    it('should return a single point', async () => {
+      const pointId = '123';
+      const mockPoint = {
+        id: pointId,
+        name: 'Test Point',
+        category: 'restaurant',
+        viewCount: 10,
+      };
+
+      mockPointsService.findOne.mockResolvedValueOnce(mockPoint);
+
+      const result = await controller.findOne(pointId);
+
+      expect(result).toEqual(mockPoint);
+      expect(mockPointsService.findOne).toHaveBeenCalledWith(pointId);
+    });
+  });
+
+  describe('getNearby', () => {
+    it('should find nearby points', async () => {
+      const mockNearbyPoints = [
+        { id: '1', name: 'Nearby 1', distance: 100 },
+        { id: '2', name: 'Nearby 2', distance: 200 },
+      ];
+
+      mockPointsService.findNearby.mockResolvedValueOnce(mockNearbyPoints);
+
+      const result = await controller.getNearby(48.8566, 2.3522, 1);
+
+      expect(result).toEqual(mockNearbyPoints);
+      expect(mockPointsService.findNearby).toHaveBeenCalledWith(48.8566, 2.3522, 1);
+    });
+  });
+
+  describe('searchHybrid', () => {
+    it('should perform hybrid search', async () => {
+      const searchDto = {
+        query: 'restaurant',
+        latitude: 48.8566,
+        longitude: 2.3522,
+        radius: 1000,
+      };
+
+      const mockSearchResults = {
+        data: [{ name: 'Combined Results' }],
+        total: 1,
+        page: 1,
+        limit: 10,
+        sources: {
+          mongodb: 1,
+          openstreetmap: 0,
+        },
+      };
+
+      mockPointsService.searchHybrid.mockResolvedValueOnce(mockSearchResults);
+
+      const result = await controller.searchHybrid(searchDto);
+
+      expect(result).toEqual(mockSearchResults);
+      expect(mockPointsService.searchHybrid).toHaveBeenCalledWith(expect.objectContaining({
+        ...searchDto,
+        includeGooglePlaces: false,
+        includeOpenStreetMap: true,
+      }));
+    });
+  });
+
+  describe('uploadPointPhoto', () => {
+    it('should upload photo to point', async () => {
+      const pointId = '123';
+      const mockFile = {
+        buffer: Buffer.from('test'),
+        originalname: 'test.jpg',
+        mimetype: 'image/jpeg',
+      } as Express.Multer.File;
+
+      const mockUpdatedPoint = {
+        id: pointId,
+        photos: ['photo-123'],
+      };
+
+      mockPointsService.uploadPhotoForPoint = jest.fn().mockResolvedValueOnce(mockUpdatedPoint);
+
+      const result = await controller.uploadPointPhoto(
+        pointId,
+        mockFile,
+        { caption: 'Test photo' },
+        { user: { id: 'test-user-id' } }
+      );
+
+      expect(result).toEqual(mockUpdatedPoint);
+      expect(mockPointsService.uploadPhotoForPoint).toHaveBeenCalledWith(
+        pointId,
+        mockFile,
+        { caption: 'Test photo' },
+        'test-user-id'
+      );
+    });
+  });
+
+  describe('createWithPhotos', () => {
+    it('should create point with photos', async () => {
+      const createDto = {
+        name: 'Test Point',
+        latitude: 48.8566,
+        longitude: 2.3522,
+        category: 'restaurant' as any,
+        photos: [],
+      };
+
+      const mockCreatedPoint = {
+        id: '123',
+        ...createDto,
+      };
+
+      mockPointsService.createWithPhotos = jest.fn().mockResolvedValueOnce(mockCreatedPoint);
+
+      const result = await controller.createWithPhotos(
+        createDto,
+        { user: { id: 'test-user-id' } }
+      );
+
+      expect(result).toEqual(mockCreatedPoint);
+      expect(mockPointsService.createWithPhotos).toHaveBeenCalledWith(
+        createDto,
+        'test-user-id'
+      );
+    });
+  });
+
+  describe('importFromGooglePlaces', () => {
+    it('should import places from Google Places', async () => {
+      const importDto = { 
+        latitude: 48.8566,
+        longitude: 2.3522,
+        radiusKm: 1,
+        maxPlaces: 20,
+      };
+      const mockResult = {
+        imported: 15,
+        skipped: 3,
+        errors: 2,
+      };
+
+      mockPointsService.importFromGooglePlaces = jest.fn().mockResolvedValueOnce(mockResult);
+
+      const result = await controller.importFromGooglePlaces(importDto);
+
+      expect(result).toEqual(mockResult);
+      expect(mockPointsService.importFromGooglePlaces).toHaveBeenCalledWith(
+        48.8566,
+        2.3522,
+        1,
+        20
+      );
+    });
+  });
+
+  describe('getByUser', () => {
+    it('should return user points', async () => {
+      const userId = 'user-123';
+      const mockPoints = [
+        { id: '1', name: 'User Point 1' },
+        { id: '2', name: 'User Point 2' },
+      ];
+
+      mockPointsService.findByUser = jest.fn().mockResolvedValueOnce(mockPoints);
+
+      const result = await controller.getByUser(userId);
+
+      expect(result).toEqual(mockPoints);
+      expect(mockPointsService.findByUser).toHaveBeenCalledWith(userId);
+    });
+  });
+
+  describe('getPointPhotos', () => {
+    it('should return photos for a point', async () => {
+      const pointId = '123';
+      const mockPhotos = [
+        { id: 'photo-1', url: 'https://example.com/photo1.jpg' },
+        { id: 'photo-2', url: 'https://example.com/photo2.jpg' },
+      ];
+
+      mockPointsService.getPointPhotos = jest.fn().mockResolvedValueOnce(mockPhotos);
+
+      const result = await controller.getPointPhotos(pointId);
+
+      expect(result).toEqual(mockPhotos);
+      expect(mockPointsService.getPointPhotos).toHaveBeenCalledWith(pointId);
+    });
+  });
+
+  describe('getPointReviews', () => {
+    it('should return reviews for a point', async () => {
+      const pointId = '123';
+      const mockReviews = {
+        data: [
+          { id: 'review-1', rating: 5, comment: 'Great!' },
+          { id: 'review-2', rating: 4, comment: 'Good' },
+        ],
+        total: 2,
+        page: 1,
+        limit: 10,
+      };
+
+      mockReviewsService.findAll.mockResolvedValueOnce(mockReviews);
+
+      const result = await controller.getPointReviews(pointId);
+
+      expect(result).toEqual(mockReviews);
+      expect(mockReviewsService.findAll).toHaveBeenCalledWith({ pointId });
+    });
+  });
+
+  describe('admin endpoints', () => {
+    it('should get pending points', async () => {
+      const mockPendingPoints = [
+        { id: '1', name: 'Pending 1', status: 'pending' },
+      ];
+
+      mockPointsService.getPendingPoints = jest.fn().mockResolvedValueOnce(mockPendingPoints);
+
+      const result = await controller.getPendingPoints(1, 20);
+
+      expect(result).toEqual(mockPendingPoints);
+      expect(mockPointsService.getPendingPoints).toHaveBeenCalledWith(1, 20);
+    });
+
+    it('should approve a point', async () => {
+      const pointId = '123';
+      const mockApprovedPoint = {
+        id: pointId,
+        status: 'approved',
+      };
+
+      mockPointsService.updatePointStatus = jest.fn().mockResolvedValueOnce(mockApprovedPoint);
+
+      const result = await controller.approvePoint(
+        pointId,
+        { user: { id: 'admin-id' } }
+      );
+
+      expect(result).toEqual(mockApprovedPoint);
+      expect(mockPointsService.updatePointStatus).toHaveBeenCalledWith(
+        pointId,
+        'approved',
+        'admin-id'
       );
     });
   });

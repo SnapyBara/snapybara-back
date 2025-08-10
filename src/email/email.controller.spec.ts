@@ -128,7 +128,18 @@ describe('EmailController', () => {
       expect(mockResponse.send).toHaveBeenCalled();
     });
 
-    it('should handle access token', async () => {
+    it('should handle token verification error', async () => {
+      const query = { token: 'error-token' };
+
+      mockEmailService.confirmEmailWithSupabase.mockRejectedValue(new Error('Verification failed'));
+
+      await controller.confirmEmail(query, mockRequest, mockResponse);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.send).toHaveBeenCalled();
+    });
+
+    it('should handle access token with refresh token', async () => {
       const query = {
         access_token: 'access-token',
         refresh_token: 'refresh-token',
@@ -139,6 +150,72 @@ describe('EmailController', () => {
       expect(mockResponse.send).toHaveBeenCalled();
       const sentContent = (mockResponse.send as jest.Mock).mock.calls[0][0];
       expect(sentContent).toContain('Email confirmé !');
+    });
+
+    it('should handle access token without refresh token', async () => {
+      const query = {
+        access_token: 'access-token-only',
+      };
+
+      await controller.confirmEmail(query, mockRequest, mockResponse);
+
+      expect(mockResponse.send).toHaveBeenCalled();
+      const sentContent = (mockResponse.send as jest.Mock).mock.calls[0][0];
+      expect(sentContent).toContain('Email confirmé !');
+    });
+
+    it('should handle access token without refresh token on mobile', async () => {
+      const query = {
+        access_token: 'access-token-only',
+      };
+      const mobileRequest = {
+        ...mockRequest,
+        headers: {
+          'user-agent': 'Mozilla/5.0 (Android; Mobile)',
+        },
+      } as unknown as Request;
+
+      await controller.confirmEmail(query, mobileRequest, mockResponse);
+
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        'snapybara://auth/email-confirmed'
+      );
+    });
+
+    it('should handle type=signup', async () => {
+      const query = { type: 'signup' };
+
+      await controller.confirmEmail(query, mockRequest, mockResponse);
+
+      expect(mockResponse.send).toHaveBeenCalled();
+      const sentContent = (mockResponse.send as jest.Mock).mock.calls[0][0];
+      expect(sentContent).toContain('Email confirmé !');
+    });
+
+    it('should handle type=email', async () => {
+      const query = { type: 'email' };
+
+      await controller.confirmEmail(query, mockRequest, mockResponse);
+
+      expect(mockResponse.send).toHaveBeenCalled();
+      const sentContent = (mockResponse.send as jest.Mock).mock.calls[0][0];
+      expect(sentContent).toContain('Email confirmé !');
+    });
+
+    it('should handle type=signup on mobile', async () => {
+      const query = { type: 'signup' };
+      const mobileRequest = {
+        ...mockRequest,
+        headers: {
+          'user-agent': 'Mozilla/5.0 (iPhone; Mobile)',
+        },
+      } as unknown as Request;
+
+      await controller.confirmEmail(query, mobileRequest, mockResponse);
+
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        'snapybara://auth/email-confirmed'
+      );
     });
 
     it('should handle error param', async () => {
@@ -158,6 +235,18 @@ describe('EmailController', () => {
       expect(mockResponse.send).toHaveBeenCalled();
       const sentContent = (mockResponse.send as jest.Mock).mock.calls[0][0];
       expect(sentContent).toContain('Vérification en cours');
+    });
+
+    it('should handle general error', async () => {
+      const query = { token: 'token' };
+      // Mock confirmEmailWithSupabase to throw an error
+      mockEmailService.confirmEmailWithSupabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      await controller.confirmEmail(query, mockRequest, mockResponse);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
     });
   });
 

@@ -21,18 +21,14 @@ describe('UploadService', () => {
     }),
   };
 
-  const mockFile: Express.Multer.File = {
+  const mockFile = {
     fieldname: 'image',
     originalname: 'test.jpg',
     encoding: '7bit',
     mimetype: 'image/jpeg',
     buffer: Buffer.from('test'),
     size: 1024,
-    stream: null as any,
-    destination: '',
-    filename: '',
-    path: '',
-  };
+  } as Express.Multer.File;
 
   const mockSharpInstance = {
     metadata: jest.fn().mockResolvedValue({ width: 1920, height: 1080 }),
