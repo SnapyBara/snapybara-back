@@ -84,11 +84,12 @@ jobs:
         GOOGLE_CLIENT_ID: test-client-id
         GOOGLE_CLIENT_SECRET: test-client-secret
 
-    - name: Upload coverage reports
+    - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       if: matrix.node-version == '20.x'
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        slug: SnapyBara/snapybara-back
         directory: ./coverage
         flags: backend
         name: backend-coverage
