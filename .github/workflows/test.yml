@@ -3,22 +3,12 @@ name: Backend Tests CI
 on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'snapybara-back/**'
-      - '.github/workflows/test.yml'
   pull_request:
     branches: [ main, develop ]
-    paths:
-      - 'snapybara-back/**'
-      - '.github/workflows/test.yml'
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
-    defaults:
-      run:
-        working-directory: snapybara-back
 
     services:
       mongodb:
@@ -96,7 +86,7 @@ jobs:
       uses: codecov/codecov-action@v3
       if: matrix.node-version == '20.x'
       with:
-        directory: ./snapybara-back/coverage
+        directory: ./coverage
         flags: backend
         name: backend-coverage
         fail_ci_if_error: false
@@ -107,16 +97,12 @@ jobs:
       with:
         name: test-results-${{ matrix.node-version }}
         path: |
-          snapybara-back/coverage
-          snapybara-back/test-results
+          coverage
+          test-results
 
   build:
     needs: test
     runs-on: ubuntu-latest
-    
-    defaults:
-      run:
-        working-directory: snapybara-back
 
     steps:
     - uses: actions/checkout@v4
@@ -153,7 +139,7 @@ jobs:
     - name: Build Docker image
       uses: docker/build-push-action@v5
       with:
-        context: ./snapybara-back
+        context: .
         push: false
         tags: snapybara-back:test
         cache-from: type=gha
