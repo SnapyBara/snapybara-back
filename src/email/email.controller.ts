@@ -27,7 +27,6 @@ export class EmailController {
     @Res() res: Response,
   ) {
     try {
-
       const userAgent = req.headers['user-agent'] ?? '';
       const isMobile =
         /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
@@ -118,7 +117,6 @@ export class EmailController {
     @Res() res: Response,
   ) {
     try {
-
       const userAgent = req.headers['user-agent'] || '';
       const isMobile =
         /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
@@ -150,7 +148,6 @@ export class EmailController {
       }
 
       if (access_token && refresh_token) {
-
         if (isMobile) {
           const appUrl = `snapybara://auth/password-reset?access_token=${encodeURIComponent(access_token)}&refresh_token=${encodeURIComponent(refresh_token)}`;
           return res.redirect(appUrl);
@@ -170,7 +167,6 @@ export class EmailController {
   @Get('reset-password-form')
   @Public()
   resetPasswordForm(@Query() query: any, @Res() res: Response) {
-
     const {
       access_token,
       refresh_token,
@@ -180,11 +176,7 @@ export class EmailController {
     } = query;
 
     if (error) {
-      console.log(
-        'error in reset-password-form:',
-        error,
-        error_description,
-      );
+      console.log('error in reset-password-form:', error, error_description);
 
       if (error === 'access_denied' && error_description?.includes('expired')) {
         return res.send(this.getTokenExpiredPage());

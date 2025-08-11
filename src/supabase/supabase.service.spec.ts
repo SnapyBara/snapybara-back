@@ -59,12 +59,12 @@ describe('SupabaseService', () => {
       expect(createClient).toHaveBeenCalledWith(
         mockOptions.supabaseUrl,
         mockOptions.supabaseKey,
-        {}
+        {},
       );
       expect(createClient).toHaveBeenCalledWith(
         mockOptions.supabaseUrl,
         mockOptions.supabaseServiceKey,
-        {}
+        {},
       );
     });
   });
@@ -204,7 +204,7 @@ describe('SupabaseService', () => {
   describe('setAuth', () => {
     it('should create new client with auth token', () => {
       const token = 'test-token';
-      
+
       service.setAuth(token);
 
       expect(createClient).toHaveBeenCalledWith(
@@ -216,7 +216,7 @@ describe('SupabaseService', () => {
               Authorization: `Bearer ${token}`,
             },
           },
-        }
+        },
       );
     });
   });

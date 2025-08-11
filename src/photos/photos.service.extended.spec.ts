@@ -151,12 +151,12 @@ describe('PhotosService - Extended Coverage', () => {
     it('should throw NotFoundException when photo not found', async () => {
       mockPhotoModel.exec.mockResolvedValueOnce(null);
 
-      await expect(
-        service.findOne('507f1f77bcf86cd799439011'),
-      ).rejects.toThrow(NotFoundException);
-      await expect(
-        service.findOne('507f1f77bcf86cd799439011'),
-      ).rejects.toThrow('Photo not found');
+      await expect(service.findOne('507f1f77bcf86cd799439011')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.findOne('507f1f77bcf86cd799439011')).rejects.toThrow(
+        'Photo not found',
+      );
     });
   });
 

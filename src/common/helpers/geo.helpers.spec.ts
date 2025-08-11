@@ -12,7 +12,7 @@ describe('Geo Helpers', () => {
         paris.lat,
         paris.lng,
         london.lat,
-        london.lng
+        london.lng,
       );
 
       // Distance should be approximately 344 km
@@ -31,14 +31,14 @@ describe('Geo Helpers', () => {
 
     it('should handle negative coordinates', () => {
       // New York to Sydney
-      const newYork = { lat: 40.7128, lng: -74.0060 };
+      const newYork = { lat: 40.7128, lng: -74.006 };
       const sydney = { lat: -33.8688, lng: 151.2093 };
 
       const distance = geoHelpers.calculateDistance(
         newYork.lat,
         newYork.lng,
         sydney.lat,
-        sydney.lng
+        sydney.lng,
       );
 
       // Distance should be approximately 15,988 km
@@ -63,7 +63,11 @@ describe('Geo Helpers', () => {
       const center = { lat: 48.8566, lng: 2.3522 }; // Paris
       const radius = 5; // 5 km
 
-      const bbox = geoHelpers.calculateBoundingBox(center.lat, center.lng, radius);
+      const bbox = geoHelpers.calculateBoundingBox(
+        center.lat,
+        center.lng,
+        radius,
+      );
 
       expect(bbox).toHaveProperty('north');
       expect(bbox).toHaveProperty('south');
@@ -85,7 +89,11 @@ describe('Geo Helpers', () => {
       const center = { lat: 0, lng: 0 };
       const radius = 10;
 
-      const bbox = geoHelpers.calculateBoundingBox(center.lat, center.lng, radius);
+      const bbox = geoHelpers.calculateBoundingBox(
+        center.lat,
+        center.lng,
+        radius,
+      );
 
       // At equator, the bounding box should be symmetric
       expect(Math.abs(bbox.south)).toBeCloseTo(Math.abs(bbox.north), 5);
@@ -96,7 +104,11 @@ describe('Geo Helpers', () => {
       const center = { lat: 45, lng: 0 };
       const radius = 1000; // 1000 km
 
-      const bbox = geoHelpers.calculateBoundingBox(center.lat, center.lng, radius);
+      const bbox = geoHelpers.calculateBoundingBox(
+        center.lat,
+        center.lng,
+        radius,
+      );
 
       // Bounding box should be significantly larger
       expect(bbox.north - bbox.south).toBeGreaterThan(10);
@@ -179,7 +191,7 @@ describe('Geo Helpers', () => {
       const locations: Location[] = [
         { latitude: 48.8566, longitude: 2.3522 },
         { latitude: 48.8606, longitude: 2.3376 },
-        { latitude: 48.8530, longitude: 2.3499 },
+        { latitude: 48.853, longitude: 2.3499 },
       ];
 
       const center = geoHelpers.calculateCenterPoint(locations);
@@ -197,7 +209,7 @@ describe('Geo Helpers', () => {
 
     it('should throw error for empty array', () => {
       expect(() => geoHelpers.calculateCenterPoint([])).toThrow(
-        'Au moins un point est requis'
+        'Au moins un point est requis',
       );
     });
   });
@@ -211,14 +223,14 @@ describe('Geo Helpers', () => {
         const randomLocation = geoHelpers.generateRandomLocationInRadius(
           center.lat,
           center.lng,
-          radius
+          radius,
         );
 
         const distance = geoHelpers.calculateDistance(
           center.lat,
           center.lng,
           randomLocation.latitude,
-          randomLocation.longitude
+          randomLocation.longitude,
         );
 
         expect(distance).toBeLessThanOrEqual(radius);
@@ -238,7 +250,10 @@ describe('Geo Helpers', () => {
       expect(geoHelpers.dmsToDecimal(33, 52, 8, 'S')).toBeCloseTo(-33.8689, 4);
 
       // 151°12'33"E
-      expect(geoHelpers.dmsToDecimal(151, 12, 33, 'E')).toBeCloseTo(151.2092, 4);
+      expect(geoHelpers.dmsToDecimal(151, 12, 33, 'E')).toBeCloseTo(
+        151.2092,
+        4,
+      );
     });
   });
 
@@ -263,7 +278,7 @@ describe('Geo Helpers', () => {
       const userLocation: Location = { latitude: 48.8566, longitude: 2.3522 };
       const points = [
         { id: 1, latitude: 48.8606, longitude: 2.3376 },
-        { id: 2, latitude: 48.8530, longitude: 2.3499 },
+        { id: 2, latitude: 48.853, longitude: 2.3499 },
         { id: 3, latitude: 51.5074, longitude: -0.1278 },
       ];
 
@@ -272,7 +287,7 @@ describe('Geo Helpers', () => {
       expect(nearest).toHaveLength(2);
       // Don't check specific order as both points are very close
       // Just verify they are the two closest points
-      const ids = nearest.map(p => p.id).sort();
+      const ids = nearest.map((p) => p.id).sort();
       expect(ids).toEqual([1, 2]);
       expect(nearest[0].distance).toBeDefined();
       expect(nearest[1].distance).toBeDefined();
@@ -316,7 +331,12 @@ describe('Geo Helpers', () => {
     });
 
     it('should return 0 for same location', () => {
-      const bearing = geoHelpers.calculateBearing(48.8566, 2.3522, 48.8566, 2.3522);
+      const bearing = geoHelpers.calculateBearing(
+        48.8566,
+        2.3522,
+        48.8566,
+        2.3522,
+      );
       expect(bearing).toBe(0);
     });
   });

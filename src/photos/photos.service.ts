@@ -205,10 +205,10 @@ export class PhotosService {
     }
 
     return this.photoModel
-      .find({ 
+      .find({
         pointId: new Types.ObjectId(pointId),
         isActive: true,
-        status: 'approved'
+        status: 'approved',
       })
       .sort({ createdAt: -1 })
       .populate('userId', 'username profilePicture')
@@ -235,7 +235,9 @@ export class PhotosService {
       mimeType: uploadedFile.mimeType,
       width: uploadedFile.width,
       height: uploadedFile.height,
-      pointId: uploadPhotoDto.pointId ? new Types.ObjectId(uploadPhotoDto.pointId) : undefined,
+      pointId: uploadPhotoDto.pointId
+        ? new Types.ObjectId(uploadPhotoDto.pointId)
+        : undefined,
       caption: uploadPhotoDto.caption,
       tags: uploadPhotoDto.tags || [],
       isPublic: uploadPhotoDto.isPublic !== false,

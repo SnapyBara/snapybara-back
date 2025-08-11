@@ -3,7 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { CacheService } from '../cache/cache.service';
 import { OverpassMonitorService } from './overpass-monitor.service';
-import { OVERPASS_CONFIG, QUERY_GROUPS } from './overpass.constants';
+import { OVERPASS_CONFIG } from './overpass.constants';
 
 export interface OverpassPOI {
   id: string;

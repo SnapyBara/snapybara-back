@@ -33,7 +33,7 @@ describe('CacheService', () => {
     it('should get value from cache', async () => {
       const key = 'test-key';
       const value = { data: 'test' };
-      
+
       mockCacheManager.get.mockResolvedValue(value);
 
       const result = await service.get(key);
@@ -44,7 +44,7 @@ describe('CacheService', () => {
 
     it('should return undefined on error', async () => {
       const key = 'test-key';
-      
+
       mockCacheManager.get.mockRejectedValue(new Error('Cache error'));
 
       const result = await service.get(key);
@@ -57,7 +57,7 @@ describe('CacheService', () => {
     it('should set value in cache with default TTL', async () => {
       const key = 'test-key';
       const value = { data: 'test' };
-      
+
       await service.set(key, value);
 
       expect(cacheManager.set).toHaveBeenCalledWith(key, value, 3600);
@@ -67,7 +67,7 @@ describe('CacheService', () => {
       const key = 'test-key';
       const value = { data: 'test' };
       const ttl = 7200;
-      
+
       await service.set(key, value, { ttl });
 
       expect(cacheManager.set).toHaveBeenCalledWith(key, value, ttl);
@@ -77,7 +77,7 @@ describe('CacheService', () => {
   describe('del', () => {
     it('should delete key from cache', async () => {
       const key = 'test-key';
-      
+
       await service.del(key);
 
       expect(cacheManager.del).toHaveBeenCalledWith(key);
@@ -87,11 +87,11 @@ describe('CacheService', () => {
   describe('reset', () => {
     it('should log warning that reset is not available', async () => {
       const loggerSpy = jest.spyOn((service as any).logger, 'warn');
-      
+
       await service.reset();
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        'Cache RESET - Method not available in this version'
+        'Cache RESET - Method not available in this version',
       );
     });
   });
@@ -101,7 +101,7 @@ describe('CacheService', () => {
       const key = 'test-key';
       const cachedValue = { data: 'cached' };
       const factory = jest.fn();
-      
+
       mockCacheManager.get.mockResolvedValue(cachedValue);
 
       const result = await service.getOrSet(key, factory);
@@ -115,7 +115,7 @@ describe('CacheService', () => {
       const newValue = { data: 'new' };
       const factory = jest.fn().mockResolvedValue(newValue);
       const ttl = 1800;
-      
+
       mockCacheManager.get.mockResolvedValue(undefined);
 
       const result = await service.getOrSet(key, factory, { ttl });
@@ -213,7 +213,9 @@ describe('CacheService', () => {
 
       const result = service.generateNominatimKey(category, bounds);
 
-      expect(result).toBe('overpass:nominatim:restaurant:48.80,2.30,48.90,2.40');
+      expect(result).toBe(
+        'overpass:nominatim:restaurant:48.80,2.30,48.90,2.40',
+      );
     });
   });
 
@@ -243,7 +245,7 @@ describe('CacheService', () => {
       const key = 'test-key';
       const staleValue = { data: 'stale' };
       const factory = jest.fn().mockRejectedValue(new Error('API error'));
-      
+
       mockCacheManager.get
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(staleValue);
@@ -258,12 +260,12 @@ describe('CacheService', () => {
     it('should throw error without fallback option', async () => {
       const key = 'test-key';
       const factory = jest.fn().mockRejectedValue(new Error('API error'));
-      
+
       mockCacheManager.get.mockResolvedValue(undefined);
 
-      await expect(
-        service.getOrSetWithFreshness(key, factory)
-      ).rejects.toThrow('API error');
+      await expect(service.getOrSetWithFreshness(key, factory)).rejects.toThrow(
+        'API error',
+      );
     });
   });
 
@@ -274,7 +276,7 @@ describe('CacheService', () => {
       await service.invalidateAreaCache(48.8566, 2.3522, 1000);
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        'Area cache invalidation requested for 48.8566,2.3522 radius 1000'
+        'Area cache invalidation requested for 48.8566,2.3522 radius 1000',
       );
     });
   });

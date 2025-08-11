@@ -73,9 +73,21 @@ describe('NotificationsController', () => {
         limit: 10,
       };
 
-      mockNotificationsService.findByUser.mockResolvedValue({ data: [], total: 0, unreadCount: 0, page: 2, limit: 10 });
+      mockNotificationsService.findByUser.mockResolvedValue({
+        data: [],
+        total: 0,
+        unreadCount: 0,
+        page: 2,
+        limit: 10,
+      });
 
-      await controller.findByUser(req, filters.isRead, filters.type, filters.page, filters.limit);
+      await controller.findByUser(
+        req,
+        filters.isRead,
+        filters.type,
+        filters.page,
+        filters.limit,
+      );
 
       expect(service.findByUser).toHaveBeenCalledWith(mockUser.id, filters);
     });
@@ -84,18 +96,23 @@ describe('NotificationsController', () => {
   describe('markAsRead', () => {
     it('should mark notification as read', async () => {
       const notificationId = 'notif-123';
-      const updatedNotification = { 
-        _id: notificationId, 
+      const updatedNotification = {
+        _id: notificationId,
         isRead: true,
         readAt: new Date(),
       };
 
-      mockNotificationsService.markAsRead.mockResolvedValue(updatedNotification);
+      mockNotificationsService.markAsRead.mockResolvedValue(
+        updatedNotification,
+      );
 
       const req = { user: mockUser };
       const result = await controller.markAsRead(notificationId, req);
 
-      expect(service.markAsRead).toHaveBeenCalledWith(notificationId, mockUser.id);
+      expect(service.markAsRead).toHaveBeenCalledWith(
+        notificationId,
+        mockUser.id,
+      );
       expect(result).toEqual(updatedNotification);
     });
   });
@@ -123,7 +140,7 @@ describe('NotificationsController', () => {
 
       expect(service.deleteNotification).toHaveBeenCalledWith(
         notificationId,
-        mockUser.id
+        mockUser.id,
       );
     });
   });
@@ -131,14 +148,16 @@ describe('NotificationsController', () => {
   describe('clearOldNotifications', () => {
     it('should clear old notifications with default days', async () => {
       const response = { deletedCount: 10 };
-      mockNotificationsService.clearOldNotifications.mockResolvedValue(response);
+      mockNotificationsService.clearOldNotifications.mockResolvedValue(
+        response,
+      );
 
       const req = { user: mockUser };
       const result = await controller.clearOldNotifications(req);
 
       expect(service.clearOldNotifications).toHaveBeenCalledWith(
         mockUser.id,
-        undefined
+        undefined,
       );
       expect(result).toEqual(response);
     });
@@ -146,14 +165,16 @@ describe('NotificationsController', () => {
     it('should clear old notifications with custom days', async () => {
       const daysToKeep = 7;
       const response = { deletedCount: 5 };
-      mockNotificationsService.clearOldNotifications.mockResolvedValue(response);
+      mockNotificationsService.clearOldNotifications.mockResolvedValue(
+        response,
+      );
 
       const req = { user: mockUser };
       const result = await controller.clearOldNotifications(req, daysToKeep);
 
       expect(service.clearOldNotifications).toHaveBeenCalledWith(
         mockUser.id,
-        daysToKeep
+        daysToKeep,
       );
       expect(result).toEqual(response);
     });

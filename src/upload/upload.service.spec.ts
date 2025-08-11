@@ -39,12 +39,12 @@ describe('UploadService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    
+
     // Mock fs methods
     (fs.existsSync as jest.Mock).mockReturnValue(false);
     (fs.mkdirSync as jest.Mock).mockImplementation(() => {});
     (fs.unlinkSync as jest.Mock).mockImplementation(() => {});
-    
+
     // Mock sharp
     (sharp as unknown as jest.Mock).mockReturnValue(mockSharpInstance);
 
@@ -66,25 +66,25 @@ describe('UploadService', () => {
     it('should create upload directories on initialization', () => {
       expect(fs.mkdirSync).toHaveBeenCalledWith(
         expect.stringContaining('original'),
-        { recursive: true }
+        { recursive: true },
       );
       expect(fs.mkdirSync).toHaveBeenCalledWith(
         expect.stringContaining('thumbnail'),
-        { recursive: true }
+        { recursive: true },
       );
       expect(fs.mkdirSync).toHaveBeenCalledWith(
         expect.stringContaining('medium'),
-        { recursive: true }
+        { recursive: true },
       );
       expect(fs.mkdirSync).toHaveBeenCalledWith(
         expect.stringContaining('large'),
-        { recursive: true }
+        { recursive: true },
       );
     });
 
     it('should use default values if config not provided', () => {
       jest.clearAllMocks(); // Clear all mocks before this test
-      
+
       const mockConfigWithoutValues = {
         get: jest.fn().mockReturnValue(null),
       };
@@ -93,7 +93,7 @@ describe('UploadService', () => {
 
       expect(fs.mkdirSync).toHaveBeenCalledWith(
         expect.stringContaining('uploads/original'),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
   });
@@ -104,10 +104,14 @@ describe('UploadService', () => {
 
       expect(sharp).toHaveBeenCalledWith(mockFile.buffer);
       expect(mockSharpInstance.toFile).toHaveBeenCalledTimes(4); // original + 3 sizes
-      
+
       expect(result).toMatchObject({
-        originalUrl: expect.stringContaining('http://test.com/uploads/original/'),
-        thumbnailUrl: expect.stringContaining('http://test.com/uploads/thumbnail/'),
+        originalUrl: expect.stringContaining(
+          'http://test.com/uploads/original/',
+        ),
+        thumbnailUrl: expect.stringContaining(
+          'http://test.com/uploads/thumbnail/',
+        ),
         mediumUrl: expect.stringContaining('http://test.com/uploads/medium/'),
         largeUrl: expect.stringContaining('http://test.com/uploads/large/'),
         filename: expect.stringMatching(/^[0-9a-f-]+\.jpg$/),
@@ -142,10 +146,12 @@ describe('UploadService', () => {
     });
 
     it('should throw BadRequestException on error', async () => {
-      mockSharpInstance.metadata.mockRejectedValue(new Error('Processing error'));
+      mockSharpInstance.metadata.mockRejectedValue(
+        new Error('Processing error'),
+      );
 
       await expect(service.uploadImage(mockFile)).rejects.toThrow(
-        BadRequestException
+        BadRequestException,
       );
     });
   });
@@ -159,16 +165,16 @@ describe('UploadService', () => {
 
       expect(fs.unlinkSync).toHaveBeenCalledTimes(4);
       expect(fs.unlinkSync).toHaveBeenCalledWith(
-        expect.stringContaining('original/test-image.jpg')
+        expect.stringContaining('original/test-image.jpg'),
       );
       expect(fs.unlinkSync).toHaveBeenCalledWith(
-        expect.stringContaining('thumbnail/test-image.jpg')
+        expect.stringContaining('thumbnail/test-image.jpg'),
       );
       expect(fs.unlinkSync).toHaveBeenCalledWith(
-        expect.stringContaining('medium/test-image.jpg')
+        expect.stringContaining('medium/test-image.jpg'),
       );
       expect(fs.unlinkSync).toHaveBeenCalledWith(
-        expect.stringContaining('large/test-image.jpg')
+        expect.stringContaining('large/test-image.jpg'),
       );
     });
 
@@ -186,15 +192,17 @@ describe('UploadService', () => {
     it('should return correct path for image size', () => {
       const filename = 'test-image.jpg';
 
-      expect(service.getImagePath(filename)).toContain('original/test-image.jpg');
+      expect(service.getImagePath(filename)).toContain(
+        'original/test-image.jpg',
+      );
       expect(service.getImagePath(filename, 'thumbnail')).toContain(
-        'thumbnail/test-image.jpg'
+        'thumbnail/test-image.jpg',
       );
       expect(service.getImagePath(filename, 'medium')).toContain(
-        'medium/test-image.jpg'
+        'medium/test-image.jpg',
       );
       expect(service.getImagePath(filename, 'large')).toContain(
-        'large/test-image.jpg'
+        'large/test-image.jpg',
       );
     });
   });

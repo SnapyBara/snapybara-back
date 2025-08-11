@@ -56,15 +56,17 @@ describe('JwtAuthGuard', () => {
         },
       });
       const mockUser = { id: '123', email: 'test@example.com' };
-      
+
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
       mockAuthService.validateSupabaseToken.mockResolvedValue(mockUser);
 
       const result = await guard.canActivate(context);
 
-      expect(authService.validateSupabaseToken).toHaveBeenCalledWith('valid-token');
+      expect(authService.validateSupabaseToken).toHaveBeenCalledWith(
+        'valid-token',
+      );
       expect(result).toBe(true);
-      
+
       const request = context.switchToHttp().getRequest();
       expect(request.user).toEqual(mockUser);
     });
@@ -73,11 +75,11 @@ describe('JwtAuthGuard', () => {
       const context = createMockExecutionContext({
         headers: {},
       });
-      
+
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
 
       await expect(guard.canActivate(context)).rejects.toThrow(
-        new UnauthorizedException('No authentication token provided')
+        new UnauthorizedException('No authentication token provided'),
       );
     });
 
@@ -87,14 +89,14 @@ describe('JwtAuthGuard', () => {
           authorization: 'Bearer invalid-token',
         },
       });
-      
+
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
       mockAuthService.validateSupabaseToken.mockRejectedValue(
-        new Error('Invalid token')
+        new Error('Invalid token'),
       );
 
       await expect(guard.canActivate(context)).rejects.toThrow(
-        new UnauthorizedException('Invalid authentication token')
+        new UnauthorizedException('Invalid authentication token'),
       );
     });
   });

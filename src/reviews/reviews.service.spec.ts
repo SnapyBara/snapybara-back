@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewsService } from './reviews.service';
 import { PointsService } from '../points/points.service';
 import { getModelToken } from '@nestjs/mongoose';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 
 describe('ReviewsService', () => {
@@ -39,10 +43,10 @@ describe('ReviewsService', () => {
 
     const mockConstructor = jest.fn().mockImplementation((data) => ({
       ...data,
-      save: jest.fn().mockResolvedValue({ 
-        ...data, 
+      save: jest.fn().mockResolvedValue({
+        ...data,
         _id: new Types.ObjectId(),
-        pointId: new Types.ObjectId(data.pointId)
+        pointId: new Types.ObjectId(data.pointId),
       }),
     }));
     Object.assign(mockConstructor, mockReviewModel);
@@ -95,10 +99,10 @@ describe('ReviewsService', () => {
       expect(result.userId).toBe('user-123');
       expect(result.pointId).toBeInstanceOf(Types.ObjectId);
       expect(result.pointId.toString()).toBe(createReviewDto.pointId);
-      
+
       expect(mockPointsService.updatePointStatistics).toHaveBeenCalledWith(
         createReviewDto.pointId,
-        { averageRating: 4.5, totalReviews: 10 }
+        { averageRating: 4.5, totalReviews: 10 },
       );
     });
 
@@ -111,9 +115,9 @@ describe('ReviewsService', () => {
 
       mockReviewModel.findOne.mockResolvedValueOnce({ _id: 'existing-review' });
 
-      await expect(
-        service.create(createReviewDto, 'user-123')
-      ).rejects.toThrow(ConflictException);
+      await expect(service.create(createReviewDto, 'user-123')).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -139,9 +143,7 @@ describe('ReviewsService', () => {
 
     it('should filter by pointId', async () => {
       const pointId = '507f1f77bcf86cd799439011';
-      const mockReviews = [
-        { _id: '1', rating: 5, pointId },
-      ];
+      const mockReviews = [{ _id: '1', rating: 5, pointId }];
 
       mockReviewModel.exec.mockResolvedValueOnce(mockReviews);
       mockReviewModel.countDocuments.mockResolvedValueOnce(1);
@@ -158,9 +160,7 @@ describe('ReviewsService', () => {
 
     it('should filter by userId', async () => {
       const userId = 'user-123';
-      const mockReviews = [
-        { _id: '1', rating: 5, userId },
-      ];
+      const mockReviews = [{ _id: '1', rating: 5, userId }];
 
       mockReviewModel.exec.mockResolvedValueOnce(mockReviews);
       mockReviewModel.countDocuments.mockResolvedValueOnce(1);
@@ -250,7 +250,7 @@ describe('ReviewsService', () => {
       mockReviewModel.findById.mockResolvedValueOnce(null);
 
       await expect(
-        service.update(reviewId, { rating: 5 }, 'user-123')
+        service.update(reviewId, { rating: 5 }, 'user-123'),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -264,7 +264,7 @@ describe('ReviewsService', () => {
       mockReviewModel.findById.mockResolvedValueOnce(mockReview);
 
       await expect(
-        service.update(reviewId, { rating: 5 }, 'user-123')
+        service.update(reviewId, { rating: 5 }, 'user-123'),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -298,9 +298,9 @@ describe('ReviewsService', () => {
 
       mockReviewModel.findById.mockResolvedValueOnce(mockReview);
 
-      await expect(
-        service.remove(reviewId, 'user-123')
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.remove(reviewId, 'user-123')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -352,11 +352,26 @@ describe('ReviewsService', () => {
     it('should calculate point statistics', async () => {
       const pointId = new Types.ObjectId().toString();
       const mockReviews = [
-        { rating: 5 }, { rating: 5 }, { rating: 5 }, { rating: 5 },
-        { rating: 5 }, { rating: 5 }, { rating: 5 }, { rating: 5 },
-        { rating: 4 }, { rating: 4 }, { rating: 4 }, { rating: 4 },
-        { rating: 4 }, { rating: 4 }, { rating: 3 }, { rating: 3 },
-        { rating: 3 }, { rating: 2 }, { rating: 2 }, { rating: 1 },
+        { rating: 5 },
+        { rating: 5 },
+        { rating: 5 },
+        { rating: 5 },
+        { rating: 5 },
+        { rating: 5 },
+        { rating: 5 },
+        { rating: 5 },
+        { rating: 4 },
+        { rating: 4 },
+        { rating: 4 },
+        { rating: 4 },
+        { rating: 4 },
+        { rating: 4 },
+        { rating: 3 },
+        { rating: 3 },
+        { rating: 3 },
+        { rating: 2 },
+        { rating: 2 },
+        { rating: 1 },
       ];
 
       mockReviewModel.find.mockResolvedValueOnce(mockReviews);
@@ -376,7 +391,7 @@ describe('ReviewsService', () => {
 
     it('should return default stats if no reviews', async () => {
       const pointId = new Types.ObjectId().toString();
-      
+
       mockReviewModel.find.mockResolvedValueOnce([]);
 
       const result = await (service as any).getPointStatistics(pointId);

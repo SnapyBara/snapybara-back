@@ -1,4 +1,10 @@
-import { IsNumber, IsOptional, IsBoolean, IsString, IsArray } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsBoolean,
+  IsString,
+  IsArray,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { POICategory } from './create-point.dto';
 

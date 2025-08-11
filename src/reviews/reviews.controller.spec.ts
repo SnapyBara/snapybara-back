@@ -73,7 +73,10 @@ describe('ReviewsController', () => {
       const result = await controller.create(createReviewDto, mockRequest);
 
       expect(result).toEqual(expectedResult);
-      expect(mockReviewsService.create).toHaveBeenCalledWith(createReviewDto, mockUser.id);
+      expect(mockReviewsService.create).toHaveBeenCalledWith(
+        createReviewDto,
+        mockUser.id,
+      );
     });
   });
 
@@ -154,7 +157,9 @@ describe('ReviewsController', () => {
       const result = await controller.getPointStatistics(pointId);
 
       expect(result).toEqual(expectedResult);
-      expect(mockReviewsService.getPointStatistics).toHaveBeenCalledWith(pointId);
+      expect(mockReviewsService.getPointStatistics).toHaveBeenCalledWith(
+        pointId,
+      );
     });
   });
 
@@ -195,7 +200,11 @@ describe('ReviewsController', () => {
 
       mockReviewsService.update.mockResolvedValue(expectedResult);
 
-      const result = await controller.update(reviewId, updateReviewDto, mockRequest);
+      const result = await controller.update(
+        reviewId,
+        updateReviewDto,
+        mockRequest,
+      );
 
       expect(result).toEqual(expectedResult);
       expect(mockReviewsService.update).toHaveBeenCalledWith(
@@ -213,7 +222,10 @@ describe('ReviewsController', () => {
 
       await controller.remove(reviewId, mockRequest);
 
-      expect(mockReviewsService.remove).toHaveBeenCalledWith(reviewId, mockUser.id);
+      expect(mockReviewsService.remove).toHaveBeenCalledWith(
+        reviewId,
+        mockUser.id,
+      );
     });
   });
 
@@ -227,7 +239,10 @@ describe('ReviewsController', () => {
       const result = await controller.toggleHelpful(reviewId, mockRequest);
 
       expect(result).toEqual(expectedResult);
-      expect(mockReviewsService.toggleHelpful).toHaveBeenCalledWith(reviewId, mockUser.id);
+      expect(mockReviewsService.toggleHelpful).toHaveBeenCalledWith(
+        reviewId,
+        mockUser.id,
+      );
     });
   });
 });

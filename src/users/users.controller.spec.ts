@@ -52,7 +52,8 @@ describe('UsersController', () => {
           useValue: mockUsersService,
         },
       ],
-    }).overrideGuard(SimpleJwtAuthGuard)
+    })
+      .overrideGuard(SimpleJwtAuthGuard)
       .useValue({ canActivate: () => true })
       .compile();
 
@@ -90,7 +91,10 @@ describe('UsersController', () => {
 
   describe('findAll', () => {
     it('should return array of users', async () => {
-      const users = [mockUser, { ...mockUser, _id: '507f1f77bcf86cd799439012' }];
+      const users = [
+        mockUser,
+        { ...mockUser, _id: '507f1f77bcf86cd799439012' },
+      ];
       mockUsersService.findAll.mockResolvedValue(users);
 
       const result = await controller.findAll(50, 0);
@@ -118,7 +122,10 @@ describe('UsersController', () => {
 
       const result = await controller.getModerators();
 
-      expect(usersService.findByRole).toHaveBeenCalledWith(['moderator', 'admin']);
+      expect(usersService.findByRole).toHaveBeenCalledWith([
+        'moderator',
+        'admin',
+      ]);
       expect(result).toHaveLength(2);
     });
   });
@@ -160,9 +167,12 @@ describe('UsersController', () => {
     it('should return user profile by supabase ID', async () => {
       mockUsersService.findBySupabaseId.mockResolvedValue(mockUser);
 
-      const result = await controller.getProfileBySupabaseId('test-supabase-id');
+      const result =
+        await controller.getProfileBySupabaseId('test-supabase-id');
 
-      expect(usersService.findBySupabaseId).toHaveBeenCalledWith('test-supabase-id');
+      expect(usersService.findBySupabaseId).toHaveBeenCalledWith(
+        'test-supabase-id',
+      );
       expect(result).toMatchObject({
         _id: mockUser._id,
         email: mockUser.email,
@@ -173,7 +183,6 @@ describe('UsersController', () => {
         profilePicture: mockUser.profilePicture,
         isActive: mockUser.isActive,
       });
-
     });
 
     it('should throw not found exception if user not found', async () => {
@@ -181,7 +190,9 @@ describe('UsersController', () => {
 
       await expect(
         controller.getProfileBySupabaseId('non-existent-id'),
-      ).rejects.toThrow(new HttpException('User not found', HttpStatus.NOT_FOUND));
+      ).rejects.toThrow(
+        new HttpException('User not found', HttpStatus.NOT_FOUND),
+      );
     });
   });
 
@@ -214,9 +225,15 @@ describe('UsersController', () => {
       };
 
       mockUsersService.findByUsername.mockResolvedValue(null);
-      mockUsersService.update.mockResolvedValue({ ...mockUser, ...updateProfileDto });
+      mockUsersService.update.mockResolvedValue({
+        ...mockUser,
+        ...updateProfileDto,
+      });
 
-      const result = await controller.updateMyProfile(currentUser, updateProfileDto);
+      const result = await controller.updateMyProfile(
+        currentUser,
+        updateProfileDto,
+      );
 
       expect(usersService.findByUsername).toHaveBeenCalledWith('newusername');
       expect(usersService.update).toHaveBeenCalledWith(
@@ -251,7 +268,10 @@ describe('UsersController', () => {
       mockUsersService.findByUsername.mockResolvedValue(mockUser);
       mockUsersService.update.mockResolvedValue(mockUser);
 
-      const result = await controller.updateMyProfile(currentUser, updateProfileDto);
+      const result = await controller.updateMyProfile(
+        currentUser,
+        updateProfileDto,
+      );
 
       expect(usersService.update).toHaveBeenCalled();
       expect(result).toMatchObject({
@@ -280,7 +300,10 @@ describe('UsersController', () => {
         username: 'updateduser',
       });
 
-      const result = await controller.updateProfile(mockUser._id, updateProfileDto);
+      const result = await controller.updateProfile(
+        mockUser._id,
+        updateProfileDto,
+      );
 
       expect(usersService.update).toHaveBeenCalledWith(
         mockUser._id,
@@ -382,8 +405,14 @@ describe('UsersController', () => {
       mockUsersService.updateRole.mockResolvedValue(null);
 
       await expect(
-        controller.updateUserRole('non-existent-id', updateRoleDto, currentUser),
-      ).rejects.toThrow(new HttpException('User not found', HttpStatus.NOT_FOUND));
+        controller.updateUserRole(
+          'non-existent-id',
+          updateRoleDto,
+          currentUser,
+        ),
+      ).rejects.toThrow(
+        new HttpException('User not found', HttpStatus.NOT_FOUND),
+      );
     });
   });
 
@@ -404,7 +433,10 @@ describe('UsersController', () => {
       const achievementId = 'achievement-123';
       mockUsersService.addAchievement.mockResolvedValue(mockUser);
 
-      const result = await controller.addAchievement(mockUser._id, achievementId);
+      const result = await controller.addAchievement(
+        mockUser._id,
+        achievementId,
+      );
 
       expect(usersService.addAchievement).toHaveBeenCalledWith(
         mockUser._id,

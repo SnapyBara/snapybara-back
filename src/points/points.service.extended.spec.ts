@@ -66,7 +66,10 @@ describe('PointsService Extended Tests', () => {
         { provide: GooglePlacesService, useValue: mockGooglePlacesService },
         { provide: UploadService, useValue: mockUploadService },
         { provide: OverpassService, useValue: mockOverpassService },
-        { provide: PhotoEnrichmentService, useValue: mockPhotoEnrichmentService },
+        {
+          provide: PhotoEnrichmentService,
+          useValue: mockPhotoEnrichmentService,
+        },
         { provide: UsersService, useValue: mockUsersService },
       ],
     }).compile();
@@ -88,7 +91,9 @@ describe('PointsService Extended Tests', () => {
 
       const result = await service.findByUser('supabase-123');
       expect(result).toEqual(mockPoints);
-      expect(mockUsersService.findBySupabaseId).toHaveBeenCalledWith('supabase-123');
+      expect(mockUsersService.findBySupabaseId).toHaveBeenCalledWith(
+        'supabase-123',
+      );
     });
 
     it('should return empty array if user not found', async () => {
@@ -154,7 +159,10 @@ describe('PointsService Extended Tests', () => {
 
     it('should throw error for invalid point ID', async () => {
       await expect(
-        service.updatePointStatistics('invalid-id', { averageRating: 4, totalReviews: 1 }),
+        service.updatePointStatistics('invalid-id', {
+          averageRating: 4,
+          totalReviews: 1,
+        }),
       ).rejects.toThrow('Invalid point ID');
     });
   });
@@ -192,7 +200,11 @@ describe('PointsService Extended Tests', () => {
       mockPointModel.findById.mockResolvedValueOnce(mockPoint);
       mockPointModel.exec.mockResolvedValueOnce(mockUpdatedPoint);
 
-      const result = await service.updatePointStatus(pointId, 'approved', 'admin-123');
+      const result = await service.updatePointStatus(
+        pointId,
+        'approved',
+        'admin-123',
+      );
 
       expect(result).toEqual(mockUpdatedPoint);
       expect(mockPointModel.findByIdAndUpdate).toHaveBeenCalledWith(
@@ -252,9 +264,9 @@ describe('PointsService Extended Tests', () => {
       const pointId = new Types.ObjectId().toString();
       mockPointModel.findById.mockResolvedValueOnce(null);
 
-      await expect(service.adminDeletePoint(pointId, 'admin-123')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.adminDeletePoint(pointId, 'admin-123'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -316,8 +328,12 @@ describe('PointsService Extended Tests', () => {
         category: 'architecture',
       };
 
-      mockGooglePlacesService.getPlaceDetails.mockResolvedValueOnce(mockGooglePlace);
-      mockGooglePlacesService.convertToPointOfInterest.mockReturnValueOnce(mockConverted);
+      mockGooglePlacesService.getPlaceDetails.mockResolvedValueOnce(
+        mockGooglePlace,
+      );
+      mockGooglePlacesService.convertToPointOfInterest.mockReturnValueOnce(
+        mockConverted,
+      );
 
       const result = await service.getPlaceFromGooglePlaces(placeId, false);
 
@@ -344,11 +360,17 @@ describe('PointsService Extended Tests', () => {
       const mockSaved = {
         ...mockConverted,
         _id: new Types.ObjectId(),
-        save: jest.fn().mockResolvedValue({ ...mockConverted, _id: new Types.ObjectId() }),
+        save: jest
+          .fn()
+          .mockResolvedValue({ ...mockConverted, _id: new Types.ObjectId() }),
       };
 
-      mockGooglePlacesService.getPlaceDetails.mockResolvedValueOnce(mockGooglePlace);
-      mockGooglePlacesService.convertToPointOfInterest.mockReturnValueOnce(mockConverted);
+      mockGooglePlacesService.getPlaceDetails.mockResolvedValueOnce(
+        mockGooglePlace,
+      );
+      mockGooglePlacesService.convertToPointOfInterest.mockReturnValueOnce(
+        mockConverted,
+      );
       mockPointModel.mockImplementationOnce(() => mockSaved);
 
       const result = await service.getPlaceFromGooglePlaces(placeId, true);
@@ -370,19 +392,30 @@ describe('PointsService Extended Tests', () => {
         category: 'architecture',
       };
 
-      mockGooglePlacesService.nearbySearch.mockResolvedValueOnce(mockGooglePlaces);
-      mockGooglePlacesService.convertToPointOfInterest.mockReturnValue(mockConverted);
-      
+      mockGooglePlacesService.nearbySearch.mockResolvedValueOnce(
+        mockGooglePlaces,
+      );
+      mockGooglePlacesService.convertToPointOfInterest.mockReturnValue(
+        mockConverted,
+      );
+
       // Mock filterExistingPlaces to return all places as new
-      jest.spyOn(service as any, 'filterExistingPlaces').mockResolvedValueOnce(mockGooglePlaces);
-      
+      jest
+        .spyOn(service as any, 'filterExistingPlaces')
+        .mockResolvedValueOnce(mockGooglePlaces);
+
       const mockSaved = {
         ...mockConverted,
         save: jest.fn().mockResolvedValue({}),
       };
       mockPointModel.mockImplementation(() => mockSaved);
 
-      const result = await service.importFromGooglePlaces(48.8566, 2.3522, 5, 2);
+      const result = await service.importFromGooglePlaces(
+        48.8566,
+        2.3522,
+        5,
+        2,
+      );
 
       expect(result).toEqual({
         imported: 2,
@@ -411,7 +444,9 @@ describe('PointsService Extended Tests', () => {
         },
       ];
 
-      mockPhotoEnrichmentService.enrichPOIsWithPhotos.mockResolvedValueOnce(mockEnriched);
+      mockPhotoEnrichmentService.enrichPOIsWithPhotos.mockResolvedValueOnce(
+        mockEnriched,
+      );
 
       const result = await service.enrichPOIsWithPhotos(mockPOIs);
 
@@ -454,7 +489,12 @@ describe('PointsService Extended Tests', () => {
   describe('calculateDistance', () => {
     it('should calculate distance between two points', () => {
       // Distance between Paris and London (approx 344km)
-      const distance = (service as any).calculateDistance(48.8566, 2.3522, 51.5074, -0.1278);
+      const distance = (service as any).calculateDistance(
+        48.8566,
+        2.3522,
+        51.5074,
+        -0.1278,
+      );
       expect(distance).toBeGreaterThan(340000); // > 340km
       expect(distance).toBeLessThan(350000); // < 350km
     });
@@ -462,11 +502,21 @@ describe('PointsService Extended Tests', () => {
 
   describe('mapOSMTypeToCategory', () => {
     it('should map OSM types to categories correctly', () => {
-      expect((service as any).mapOSMTypeToCategory('viewpoint')).toBe('landscape');
-      expect((service as any).mapOSMTypeToCategory('museum')).toBe('historical');
-      expect((service as any).mapOSMTypeToCategory('church')).toBe('architecture');
-      expect((service as any).mapOSMTypeToCategory('waterfall')).toBe('landscape');
-      expect((service as any).mapOSMTypeToCategory('unknown-type')).toBe('other');
+      expect((service as any).mapOSMTypeToCategory('viewpoint')).toBe(
+        'landscape',
+      );
+      expect((service as any).mapOSMTypeToCategory('museum')).toBe(
+        'historical',
+      );
+      expect((service as any).mapOSMTypeToCategory('church')).toBe(
+        'architecture',
+      );
+      expect((service as any).mapOSMTypeToCategory('waterfall')).toBe(
+        'landscape',
+      );
+      expect((service as any).mapOSMTypeToCategory('unknown-type')).toBe(
+        'other',
+      );
     });
   });
 

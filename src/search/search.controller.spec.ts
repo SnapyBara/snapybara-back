@@ -41,15 +41,9 @@ describe('SearchController', () => {
       const types = 'point,photo,review';
       const limit = 20;
       const expectedResult = {
-        points: [
-          { _id: '1', name: 'Restaurant 1', type: 'point' },
-        ],
-        photos: [
-          { _id: 'p1', caption: 'Restaurant photo', type: 'photo' },
-        ],
-        reviews: [
-          { _id: 'r1', comment: 'Great restaurant', type: 'review' },
-        ],
+        points: [{ _id: '1', name: 'Restaurant 1', type: 'point' }],
+        photos: [{ _id: 'p1', caption: 'Restaurant photo', type: 'photo' }],
+        reviews: [{ _id: 'r1', comment: 'Great restaurant', type: 'review' }],
       };
 
       mockSearchService.globalSearch.mockResolvedValue(expectedResult);
@@ -116,10 +110,13 @@ describe('SearchController', () => {
       );
 
       expect(result).toEqual(expectedResult);
-      expect(mockSearchService.searchPointsInArea).toHaveBeenCalledWith(bounds, {
-        categories: ['restaurant', 'cafe'],
-        minRating,
-      });
+      expect(mockSearchService.searchPointsInArea).toHaveBeenCalledWith(
+        bounds,
+        {
+          categories: ['restaurant', 'cafe'],
+          minRating,
+        },
+      );
     });
 
     it('should search points in area without filters', async () => {
@@ -141,18 +138,17 @@ describe('SearchController', () => {
       );
 
       expect(result).toEqual(expectedResult);
-      expect(mockSearchService.searchPointsInArea).toHaveBeenCalledWith(bounds, {});
+      expect(mockSearchService.searchPointsInArea).toHaveBeenCalledWith(
+        bounds,
+        {},
+      );
     });
   });
 
   describe('getSuggestions', () => {
     it('should return search suggestions', async () => {
       const query = 'rest';
-      const expectedResult = [
-        'restaurant',
-        'rest area',
-        'restoration site',
-      ];
+      const expectedResult = ['restaurant', 'rest area', 'restoration site'];
 
       mockSearchService.searchSuggestions.mockResolvedValue(expectedResult);
 

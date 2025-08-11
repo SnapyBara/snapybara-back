@@ -26,7 +26,9 @@ describe('SupabaseWebhookController', () => {
       ],
     }).compile();
 
-    controller = module.get<SupabaseWebhookController>(SupabaseWebhookController);
+    controller = module.get<SupabaseWebhookController>(
+      SupabaseWebhookController,
+    );
     usersService = module.get<UsersService>(UsersService);
 
     // Mock Logger methods
@@ -62,12 +64,17 @@ describe('SupabaseWebhookController', () => {
 
       mockUsersService.syncWithSupabase.mockResolvedValue(mockUser);
 
-      const result = await controller.handleSupabaseAuthEvent(payload, authHeader);
+      const result = await controller.handleSupabaseAuthEvent(
+        payload,
+        authHeader,
+      );
 
-      expect(usersService.syncWithSupabase).toHaveBeenCalledWith(payload.record);
-      expect(result).toEqual({ 
-        success: true, 
-        message: 'Webhook processed successfully' 
+      expect(usersService.syncWithSupabase).toHaveBeenCalledWith(
+        payload.record,
+      );
+      expect(result).toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
       });
     });
 
@@ -86,12 +93,17 @@ describe('SupabaseWebhookController', () => {
 
       mockUsersService.syncWithSupabase.mockResolvedValue(mockUser);
 
-      const result = await controller.handleSupabaseAuthEvent(payload, authHeader);
+      const result = await controller.handleSupabaseAuthEvent(
+        payload,
+        authHeader,
+      );
 
-      expect(usersService.syncWithSupabase).toHaveBeenCalledWith(payload.record);
-      expect(result).toEqual({ 
-        success: true, 
-        message: 'Webhook processed successfully' 
+      expect(usersService.syncWithSupabase).toHaveBeenCalledWith(
+        payload.record,
+      );
+      expect(result).toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
       });
     });
 
@@ -102,14 +114,17 @@ describe('SupabaseWebhookController', () => {
         record: {},
       };
 
-      const result = await controller.handleSupabaseAuthEvent(payload, authHeader);
+      const result = await controller.handleSupabaseAuthEvent(
+        payload,
+        authHeader,
+      );
 
       expect(Logger.prototype.warn).toHaveBeenCalledWith(
-        'Unhandled webhook type: DELETE'
+        'Unhandled webhook type: DELETE',
       );
-      expect(result).toEqual({ 
-        success: true, 
-        message: 'Webhook processed successfully' 
+      expect(result).toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
       });
     });
 
@@ -121,9 +136,9 @@ describe('SupabaseWebhookController', () => {
       };
 
       await expect(
-        controller.handleSupabaseAuthEvent(payload, undefined)
+        controller.handleSupabaseAuthEvent(payload, undefined),
       ).rejects.toThrow(
-        new HttpException('Unauthorized webhook', HttpStatus.UNAUTHORIZED)
+        new HttpException('Unauthorized webhook', HttpStatus.UNAUTHORIZED),
       );
     });
 
@@ -135,9 +150,9 @@ describe('SupabaseWebhookController', () => {
       };
 
       await expect(
-        controller.handleSupabaseAuthEvent(payload, 'Invalid token')
+        controller.handleSupabaseAuthEvent(payload, 'Invalid token'),
       ).rejects.toThrow(
-        new HttpException('Unauthorized webhook', HttpStatus.UNAUTHORIZED)
+        new HttpException('Unauthorized webhook', HttpStatus.UNAUTHORIZED),
       );
     });
 
@@ -152,15 +167,18 @@ describe('SupabaseWebhookController', () => {
       };
 
       mockUsersService.syncWithSupabase.mockRejectedValue(
-        new Error('Database error')
+        new Error('Database error'),
       );
 
-      const result = await controller.handleSupabaseAuthEvent(payload, authHeader);
+      const result = await controller.handleSupabaseAuthEvent(
+        payload,
+        authHeader,
+      );
 
       expect(Logger.prototype.error).toHaveBeenCalled();
-      expect(result).toEqual({ 
-        success: true, 
-        message: 'Webhook processed successfully' 
+      expect(result).toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
       });
     });
 
@@ -171,12 +189,15 @@ describe('SupabaseWebhookController', () => {
         record: { id: '123' },
       };
 
-      const result = await controller.handleSupabaseAuthEvent(payload, authHeader);
+      const result = await controller.handleSupabaseAuthEvent(
+        payload,
+        authHeader,
+      );
 
       expect(usersService.syncWithSupabase).not.toHaveBeenCalled();
-      expect(result).toEqual({ 
-        success: true, 
-        message: 'Webhook processed successfully' 
+      expect(result).toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
       });
     });
   });

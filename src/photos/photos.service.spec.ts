@@ -51,7 +51,7 @@ describe('PhotosService', () => {
     photoModel = module.get(getModelToken('Photo'));
 
     jest.clearAllMocks();
-    
+
     mockPhotoModel.find.mockReturnThis();
     mockPhotoModel.findById.mockReturnThis();
     mockPhotoModel.sort.mockReturnThis();
@@ -123,18 +123,18 @@ describe('PhotosService', () => {
       };
 
       mockUploadService.uploadImage.mockResolvedValueOnce(mockUploadedFile);
-      
+
       const mockSave = jest.fn().mockResolvedValueOnce(mockSavedPhoto);
       const mockConstructor = jest.fn(() => ({
         save: mockSave,
       }));
-      
+
       (photoModel as any).mockImplementation(mockConstructor);
 
       const result = await service.uploadPhoto(
-        mockFile, 
-        uploadDto, 
-        '507f1f77bcf86cd799439011'
+        mockFile,
+        uploadDto,
+        '507f1f77bcf86cd799439011',
       );
 
       expect(mockUploadService.uploadImage).toHaveBeenCalledWith(mockFile);
@@ -167,9 +167,9 @@ describe('PhotosService', () => {
     it('should throw NotFoundException for non-existent photo', async () => {
       mockPhotoModel.exec.mockResolvedValueOnce(null);
 
-      await expect(
-        service.findOne('507f1f77bcf86cd799439011'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('507f1f77bcf86cd799439011')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -177,7 +177,7 @@ describe('PhotosService', () => {
     it('should toggle like on a photo', async () => {
       const userId = '507f1f77bcf86cd799439011';
       const photoId = '507f191e810c19729de860ea';
-      
+
       const mockPhoto = {
         id: photoId,
         likedBy: [],
@@ -192,14 +192,10 @@ describe('PhotosService', () => {
       const result = await service.toggleLike(photoId, userId);
 
       expect(result).toEqual({ liked: true, count: 1 });
-      expect(mockPhotoModel.findByIdAndUpdate).toHaveBeenCalledWith(
-        photoId,
-        {
-          $addToSet: { likedBy: expect.any(Types.ObjectId) },
-          $inc: { likesCount: 1 },
-        },
-      );
+      expect(mockPhotoModel.findByIdAndUpdate).toHaveBeenCalledWith(photoId, {
+        $addToSet: { likedBy: expect.any(Types.ObjectId) },
+        $inc: { likesCount: 1 },
+      });
     });
   });
 });
-      

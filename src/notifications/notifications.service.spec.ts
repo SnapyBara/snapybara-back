@@ -2,7 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { NotificationsService } from './notifications.service';
-import { Notification, NotificationDocument } from './schemas/notification.schema';
+import {
+  Notification,
+  NotificationDocument,
+} from './schemas/notification.schema';
 import { NotFoundException } from '@nestjs/common';
 
 describe('NotificationsService', () => {
@@ -50,7 +53,9 @@ describe('NotificationsService', () => {
     }).compile();
 
     service = module.get<NotificationsService>(NotificationsService);
-    model = module.get<Model<NotificationDocument>>(getModelToken(Notification.name));
+    model = module.get<Model<NotificationDocument>>(
+      getModelToken(Notification.name),
+    );
     jest.clearAllMocks();
   });
 
@@ -138,7 +143,7 @@ describe('NotificationsService', () => {
     it('should mark notification as read', async () => {
       const notificationId = mockNotification._id.toString();
       const userId = new Types.ObjectId().toString();
-      
+
       const notificationWithSave = {
         ...mockNotification,
         save: jest.fn().mockResolvedValue({
@@ -163,12 +168,12 @@ describe('NotificationsService', () => {
     it('should throw NotFoundException if notification not found', async () => {
       const notificationId = new Types.ObjectId().toString();
       const userId = new Types.ObjectId().toString();
-      
+
       mockNotificationModel.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.markAsRead(notificationId, userId)
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.markAsRead(notificationId, userId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -181,7 +186,7 @@ describe('NotificationsService', () => {
 
       expect(mockNotificationModel.updateMany).toHaveBeenCalledWith(
         { userId: expect.any(Types.ObjectId), isRead: false },
-        { isRead: true, readAt: expect.any(Date) }
+        { isRead: true, readAt: expect.any(Date) },
       );
       expect(result).toEqual({ modifiedCount: 5 });
     });
@@ -191,7 +196,7 @@ describe('NotificationsService', () => {
     it('should delete a notification', async () => {
       const notificationId = mockNotification._id.toString();
       const userId = new Types.ObjectId().toString();
-      
+
       mockNotificationModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
 
       await service.deleteNotification(notificationId, userId);
@@ -205,11 +210,11 @@ describe('NotificationsService', () => {
     it('should throw NotFoundException if notification not found', async () => {
       const notificationId = new Types.ObjectId().toString();
       const userId = new Types.ObjectId().toString();
-      
+
       mockNotificationModel.deleteOne.mockResolvedValue({ deletedCount: 0 });
 
       await expect(
-        service.deleteNotification(notificationId, userId)
+        service.deleteNotification(notificationId, userId),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -235,7 +240,7 @@ describe('NotificationsService', () => {
       const ownerId = new Types.ObjectId().toString();
       const likerId = new Types.ObjectId().toString();
       const photoId = new Types.ObjectId().toString();
-      
+
       await service.notifyPhotoLiked(ownerId, likerId, photoId);
 
       expect(mockNotificationModel).toHaveBeenCalledWith(
@@ -248,7 +253,7 @@ describe('NotificationsService', () => {
             entityId: photoId,
             fromUserId: likerId,
           },
-        })
+        }),
       );
     });
 
@@ -256,7 +261,7 @@ describe('NotificationsService', () => {
       const ownerId = new Types.ObjectId().toString();
       const reviewerId = new Types.ObjectId().toString();
       const pointId = new Types.ObjectId().toString();
-      
+
       await service.notifyNewReview(ownerId, reviewerId, pointId);
 
       expect(mockNotificationModel).toHaveBeenCalledWith(
@@ -269,13 +274,13 @@ describe('NotificationsService', () => {
             entityId: pointId,
             fromUserId: reviewerId,
           },
-        })
+        }),
       );
     });
 
     it('should create achievement earned notification', async () => {
       const userId = new Types.ObjectId().toString();
-      
+
       await service.notifyAchievementEarned(userId, 'First Photo', 50);
 
       expect(mockNotificationModel).toHaveBeenCalledWith(
@@ -285,7 +290,7 @@ describe('NotificationsService', () => {
           title: 'Achievement Unlocked!',
           message: 'You earned the "First Photo" achievement and 50 points!',
           priority: 'high',
-        })
+        }),
       );
     });
   });

@@ -33,7 +33,7 @@ describe('Auth Helpers', () => {
         '123@example.com',
       ];
 
-      validEmails.forEach(email => {
+      validEmails.forEach((email) => {
         expect(authHelpers.isValidEmail(email)).toBe(true);
       });
     });
@@ -48,7 +48,7 @@ describe('Auth Helpers', () => {
         '',
       ];
 
-      invalidEmails.forEach(email => {
+      invalidEmails.forEach((email) => {
         expect(authHelpers.isValidEmail(email)).toBe(false);
       });
     });
@@ -63,7 +63,7 @@ describe('Auth Helpers', () => {
         'ValidP@ss1',
       ];
 
-      strongPasswords.forEach(password => {
+      strongPasswords.forEach((password) => {
         const result = authHelpers.validatePassword(password);
         expect(result.isValid).toBe(true);
         expect(result.errors).toHaveLength(0);
@@ -73,23 +73,33 @@ describe('Auth Helpers', () => {
     it('should reject weak passwords', () => {
       const result1 = authHelpers.validatePassword('123456');
       expect(result1.isValid).toBe(false);
-      expect(result1.errors).toContain('Le mot de passe doit contenir au moins 8 caractères');
+      expect(result1.errors).toContain(
+        'Le mot de passe doit contenir au moins 8 caractères',
+      );
 
       const result2 = authHelpers.validatePassword('password');
       expect(result2.isValid).toBe(false);
-      expect(result2.errors).toContain('Le mot de passe doit contenir au moins une majuscule');
+      expect(result2.errors).toContain(
+        'Le mot de passe doit contenir au moins une majuscule',
+      );
 
       const result3 = authHelpers.validatePassword('Pass123');
       expect(result3.isValid).toBe(false);
-      expect(result3.errors).toContain('Le mot de passe doit contenir au moins un caractère spécial');
+      expect(result3.errors).toContain(
+        'Le mot de passe doit contenir au moins un caractère spécial',
+      );
     });
   });
 
   describe('maskEmail', () => {
     it('should mask email correctly', () => {
-      expect(authHelpers.maskEmail('test@example.com')).toBe('t**t@example.com');
+      expect(authHelpers.maskEmail('test@example.com')).toBe(
+        't**t@example.com',
+      );
       expect(authHelpers.maskEmail('ab@example.com')).toBe('a*@example.com');
-      expect(authHelpers.maskEmail('longusername@example.com')).toBe('l**********e@example.com');
+      expect(authHelpers.maskEmail('longusername@example.com')).toBe(
+        'l**********e@example.com',
+      );
     });
   });
 
@@ -130,10 +140,10 @@ describe('Auth Helpers', () => {
   describe('formatRelativeTime', () => {
     it('should format relative time correctly', () => {
       const now = new Date();
-      
+
       // Test "À l'instant"
       const justNow = new Date(now.getTime() - 30 * 1000); // 30 seconds ago
-      expect(authHelpers.formatRelativeTime(justNow)).toBe('À l\'instant');
+      expect(authHelpers.formatRelativeTime(justNow)).toBe("À l'instant");
 
       // Test minutes
       const minutesAgo = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago

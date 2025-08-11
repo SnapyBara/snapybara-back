@@ -67,8 +67,10 @@ describe('SupabaseAuthGuard', () => {
       const result = await guard.canActivate(context);
 
       expect(result).toBe(true);
-      expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledWith('valid-token');
-      
+      expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledWith(
+        'valid-token',
+      );
+
       const request = context.switchToHttp().getRequest();
       expect(request.user).toEqual(mockSupabaseUser);
     });
@@ -79,7 +81,7 @@ describe('SupabaseAuthGuard', () => {
       });
 
       await expect(guard.canActivate(context)).rejects.toThrow(
-        new UnauthorizedException('No authorization header')
+        new UnauthorizedException('No authorization header'),
       );
     });
 
@@ -96,7 +98,7 @@ describe('SupabaseAuthGuard', () => {
       });
 
       await expect(guard.canActivate(context)).rejects.toThrow(
-        new UnauthorizedException('Authentication failed')
+        new UnauthorizedException('Authentication failed'),
       );
     });
 
@@ -108,11 +110,11 @@ describe('SupabaseAuthGuard', () => {
       });
 
       mockSupabaseClient.auth.getUser.mockRejectedValue(
-        new Error('Supabase error')
+        new Error('Supabase error'),
       );
 
       await expect(guard.canActivate(context)).rejects.toThrow(
-        new UnauthorizedException('Authentication failed')
+        new UnauthorizedException('Authentication failed'),
       );
     });
 
@@ -136,7 +138,9 @@ describe('SupabaseAuthGuard', () => {
       const result = await guard.canActivate(context);
 
       expect(result).toBe(true);
-      expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledWith('valid-token');
+      expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledWith(
+        'valid-token',
+      );
     });
   });
 });

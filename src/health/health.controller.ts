@@ -33,7 +33,7 @@ export class HealthController {
         () => this.memory.checkRSS('memory_rss', 500 * 1024 * 1024), // 500MB
         () => this.checkSentry(),
       ]);
-      
+
       return result;
     } catch (error) {
       Sentry.captureException(error);
@@ -54,15 +54,13 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Service is ready' })
   @ApiResponse({ status: 503, description: 'Service is not ready' })
   async readiness() {
-    return this.health.check([
-      () => this.db.pingCheck('database'),
-    ]);
+    return this.health.check([() => this.db.pingCheck('database')]);
   }
 
   private async checkSentry(): Promise<HealthIndicatorResult> {
     const sentryDsn = this.configService.get('SENTRY_DSN');
     const isConfigured = !!sentryDsn;
-    
+
     return {
       sentry: {
         status: isConfigured ? 'up' : 'down',

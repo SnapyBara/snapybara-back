@@ -190,7 +190,7 @@ export function getPointsForNextLevel(currentPoints: number): number {
   const levelThresholds = [
     0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600, 4500, 5500,
   ];
-  
+
   // Trouver le prochain seuil
   for (let i = 1; i < levelThresholds.length; i++) {
     if (currentPoints < levelThresholds[i]) {

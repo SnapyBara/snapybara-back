@@ -187,7 +187,9 @@ describe('AuthService', () => {
         error: { message: 'Invalid token' },
       });
 
-      await expect(service.validateSupabaseToken(token)).rejects.toThrow(UnauthorizedException);
+      await expect(service.validateSupabaseToken(token)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should sync with MongoDB if user not found', async () => {
@@ -215,7 +217,9 @@ describe('AuthService', () => {
 
       const result = await service.validateSupabaseToken(token);
 
-      expect(mockUsersService.syncWithSupabase).toHaveBeenCalledWith(mockSupabaseUser);
+      expect(mockUsersService.syncWithSupabase).toHaveBeenCalledWith(
+        mockSupabaseUser,
+      );
       expect(result.mongoId).toBe(mockNewUser._id);
     });
   });
@@ -246,7 +250,9 @@ describe('AuthService', () => {
         role: 'user',
       };
 
-      mockSupabaseClient.auth.signInWithPassword.mockResolvedValueOnce(mockSupabaseResponse);
+      mockSupabaseClient.auth.signInWithPassword.mockResolvedValueOnce(
+        mockSupabaseResponse,
+      );
       mockUsersService.findBySupabaseId.mockResolvedValueOnce(mockMongoUser);
       mockUsersService.updateLastLogin.mockResolvedValueOnce(undefined);
 
@@ -305,7 +311,9 @@ describe('AuthService', () => {
         role: 'user',
       };
 
-      mockSupabaseClient.auth.refreshSession.mockResolvedValueOnce(mockSupabaseResponse);
+      mockSupabaseClient.auth.refreshSession.mockResolvedValueOnce(
+        mockSupabaseResponse,
+      );
       mockUsersService.findBySupabaseId.mockResolvedValueOnce(mockMongoUser);
 
       const result = await service.refreshToken(refreshToken);

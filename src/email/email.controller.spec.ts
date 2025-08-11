@@ -55,7 +55,7 @@ describe('EmailController', () => {
       const result = await controller.sendEmailConfirmation(emailData);
 
       expect(emailService.sendEmailConfirmation).toHaveBeenCalledWith(
-        'test@example.com'
+        'test@example.com',
       );
       expect(result).toEqual(mockResult);
     });
@@ -71,7 +71,7 @@ describe('EmailController', () => {
       const result = await controller.sendPasswordResetEmail(resetData);
 
       expect(emailService.sendPasswordResetEmail).toHaveBeenCalledWith(
-        'test@example.com'
+        'test@example.com',
       );
       expect(result).toEqual(mockResult);
     });
@@ -93,14 +93,15 @@ describe('EmailController', () => {
       const mobileRequest = {
         ...mockRequest,
         headers: {
-          'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
+          'user-agent':
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
         },
       } as unknown as Request;
 
       await controller.confirmEmail(query, mobileRequest, mockResponse);
 
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        'snapybara://auth/email-confirmed'
+        'snapybara://auth/email-confirmed',
       );
     });
 
@@ -112,7 +113,7 @@ describe('EmailController', () => {
       await controller.confirmEmail(query, mockRequest, mockResponse);
 
       expect(emailService.confirmEmailWithSupabase).toHaveBeenCalledWith(
-        'valid-token'
+        'valid-token',
       );
       expect(mockResponse.send).toHaveBeenCalled();
     });
@@ -131,7 +132,9 @@ describe('EmailController', () => {
     it('should handle token verification error', async () => {
       const query = { token: 'error-token' };
 
-      mockEmailService.confirmEmailWithSupabase.mockRejectedValue(new Error('Verification failed'));
+      mockEmailService.confirmEmailWithSupabase.mockRejectedValue(
+        new Error('Verification failed'),
+      );
 
       await controller.confirmEmail(query, mockRequest, mockResponse);
 
@@ -178,7 +181,7 @@ describe('EmailController', () => {
       await controller.confirmEmail(query, mobileRequest, mockResponse);
 
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        'snapybara://auth/email-confirmed'
+        'snapybara://auth/email-confirmed',
       );
     });
 
@@ -214,7 +217,7 @@ describe('EmailController', () => {
       await controller.confirmEmail(query, mobileRequest, mockResponse);
 
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        'snapybara://auth/email-confirmed'
+        'snapybara://auth/email-confirmed',
       );
     });
 
@@ -287,7 +290,7 @@ describe('EmailController', () => {
       await controller.resetPassword(query, mobileRequest, mockResponse);
 
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('snapybara://auth/password-reset')
+        expect.stringContaining('snapybara://auth/password-reset'),
       );
     });
 

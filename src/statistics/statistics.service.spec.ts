@@ -77,7 +77,7 @@ describe('StatisticsService', () => {
       mockPointModel.countDocuments.mockResolvedValue(50);
       mockPhotoModel.countDocuments.mockResolvedValue(200);
       mockReviewModel.countDocuments.mockResolvedValue(75);
-      
+
       // Mock aggregate responses
       mockPointModel.aggregate
         .mockResolvedValueOnce([
@@ -88,7 +88,7 @@ describe('StatisticsService', () => {
           { category: 'landscape', count: 20 },
           { category: 'architecture', count: 15 },
         ]);
-      
+
       const mockQuery = {
         sort: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
@@ -115,25 +115,37 @@ describe('StatisticsService', () => {
         ],
       });
 
-      expect(mockUserModel.countDocuments).toHaveBeenCalledWith({ isActive: true });
-      expect(mockPointModel.countDocuments).toHaveBeenCalledWith({ isActive: true, status: 'approved' });
-      expect(mockPhotoModel.countDocuments).toHaveBeenCalledWith({ isActive: true, status: 'approved' });
-      expect(mockReviewModel.countDocuments).toHaveBeenCalledWith({ isActive: true });
+      expect(mockUserModel.countDocuments).toHaveBeenCalledWith({
+        isActive: true,
+      });
+      expect(mockPointModel.countDocuments).toHaveBeenCalledWith({
+        isActive: true,
+        status: 'approved',
+      });
+      expect(mockPhotoModel.countDocuments).toHaveBeenCalledWith({
+        isActive: true,
+        status: 'approved',
+      });
+      expect(mockReviewModel.countDocuments).toHaveBeenCalledWith({
+        isActive: true,
+      });
     });
   });
 
   describe('getUserStatistics', () => {
     it('should return user statistics', async () => {
       const userId = '507f1f77bcf86cd799439011';
-      
+
       mockUserModel.findById.mockResolvedValue(mockUser);
       mockPointModel.countDocuments.mockResolvedValue(10);
       mockPhotoModel.countDocuments.mockResolvedValue(25);
       mockReviewModel.countDocuments.mockResolvedValue(15);
       mockUserModel.countDocuments.mockResolvedValue(5); // rank calculation
 
-      mockPhotoModel.aggregate.mockResolvedValue([{ _id: null, totalLikes: 100 }]);
-      
+      mockPhotoModel.aggregate.mockResolvedValue([
+        { _id: null, totalLikes: 100 },
+      ]);
+
       // Mock recent activity queries
       const mockQuery = {
         sort: jest.fn().mockReturnThis(),
@@ -141,7 +153,7 @@ describe('StatisticsService', () => {
         select: jest.fn().mockReturnThis(),
         lean: jest.fn().mockResolvedValue([]),
       };
-      
+
       mockPhotoModel.find.mockReturnValue(mockQuery);
       mockReviewModel.find.mockReturnValue(mockQuery);
       mockPointModel.find.mockReturnValue(mockQuery);
@@ -159,15 +171,15 @@ describe('StatisticsService', () => {
         recentActivity: [],
       });
 
-      expect(mockPointModel.countDocuments).toHaveBeenCalledWith({ 
-        userId: expect.any(Types.ObjectId), 
-        isActive: true 
+      expect(mockPointModel.countDocuments).toHaveBeenCalledWith({
+        userId: expect.any(Types.ObjectId),
+        isActive: true,
       });
     });
 
     it('should handle user not found', async () => {
       const userId = '507f1f77bcf86cd799439011';
-      
+
       mockUserModel.findById.mockResolvedValue(null);
       mockPointModel.countDocuments.mockResolvedValue(0);
       mockPhotoModel.countDocuments.mockResolvedValue(0);
@@ -175,14 +187,14 @@ describe('StatisticsService', () => {
       mockUserModel.countDocuments.mockResolvedValue(0);
 
       mockPhotoModel.aggregate.mockResolvedValue([]);
-      
+
       const mockQuery = {
         sort: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         lean: jest.fn().mockResolvedValue([]),
       };
-      
+
       mockPhotoModel.find.mockReturnValue(mockQuery);
       mockReviewModel.find.mockReturnValue(mockQuery);
       mockPointModel.find.mockReturnValue(mockQuery);

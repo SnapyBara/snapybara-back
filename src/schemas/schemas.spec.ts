@@ -1,10 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { User, UserSchema } from '../users/schemas/user.schema';
-import { PointOfInterest, PointOfInterestSchema } from '../points/schemas/point-of-interest.schema';
+import {
+  PointOfInterest,
+  PointOfInterestSchema,
+} from '../points/schemas/point-of-interest.schema';
 import { Photo, PhotoSchema } from '../photos/schemas/photo.schema';
 import { Review, ReviewSchema } from '../reviews/schemas/review.schema';
-import { Achievement, AchievementSchema } from '../achievements/schemas/achievement.schema';
+import {
+  Achievement,
+  AchievementSchema,
+} from '../achievements/schemas/achievement.schema';
 import { Report, ReportSchema } from '../reports/schemas/report.schema';
 import mongoose from 'mongoose';
 
@@ -40,7 +46,7 @@ describe('Schemas', () => {
 
       expect(emailPath.options.unique).toBe(true);
       expect(supabaseIdPath.options.unique).toBe(true);
-      
+
       // username doesn't have unique constraint in schema
       const usernamePath = schema.path('username') as any;
       expect(usernamePath.options.required).toBe(true);
@@ -195,14 +201,14 @@ describe('Schemas', () => {
 
     it('should validate rating range', () => {
       const ReviewModel = mongoose.model('ReviewRating', ReviewSchema);
-      
+
       // Test invalid ratings
       const tooLow = new ReviewModel({
         userId: 'user-uuid-123',
         pointId: new mongoose.Types.ObjectId(),
         rating: 0,
       });
-      
+
       const tooHigh = new ReviewModel({
         userId: 'user-uuid-123',
         pointId: new mongoose.Types.ObjectId(),
@@ -238,7 +244,7 @@ describe('Schemas', () => {
         category: 'exploration',
         criteria: {
           type: 'points_created',
-          target: 1
+          target: 1,
         },
         icon: 'trophy',
         points: 10,
@@ -250,7 +256,10 @@ describe('Schemas', () => {
     });
 
     it('should require mandatory fields', () => {
-      const AchievementModel = mongoose.model('AchievementValidation', AchievementSchema);
+      const AchievementModel = mongoose.model(
+        'AchievementValidation',
+        AchievementSchema,
+      );
       const invalidAchievement = new AchievementModel({});
 
       const error = invalidAchievement.validateSync();
@@ -262,7 +271,10 @@ describe('Schemas', () => {
     });
 
     it('should validate category enum', () => {
-      const AchievementModel = mongoose.model('AchievementCondition', AchievementSchema);
+      const AchievementModel = mongoose.model(
+        'AchievementCondition',
+        AchievementSchema,
+      );
       const invalidAchievement = new AchievementModel({
         code: 'TEST',
         name: 'Test Achievement',
@@ -270,7 +282,7 @@ describe('Schemas', () => {
         category: 'invalid-category', // Invalid category
         criteria: {
           type: 'test',
-          target: 1
+          target: 1,
         },
         icon: 'test-icon',
         points: 10,
@@ -339,37 +351,31 @@ describe('Schemas', () => {
   describe('Schema Indexes', () => {
     it('should have proper indexes on UserSchema', () => {
       const indexes = UserSchema.indexes();
-      
+
       // Check for email index
-      expect(indexes).toContainEqual([
-        { email: 1 },
-        expect.any(Object)
-      ]);
-      
+      expect(indexes).toContainEqual([{ email: 1 }, expect.any(Object)]);
+
       // Check for username index
-      expect(indexes).toContainEqual([
-        { username: 1 },
-        expect.any(Object)
-      ]);
+      expect(indexes).toContainEqual([{ username: 1 }, expect.any(Object)]);
     });
 
     it('should have geospatial index on PointOfInterestSchema', () => {
       const indexes = PointOfInterestSchema.indexes();
-      
+
       // Check for 2dsphere index on location
       expect(indexes).toContainEqual([
-        { 'location': '2dsphere' },
-        expect.any(Object)
+        { location: '2dsphere' },
+        expect.any(Object),
       ]);
     });
 
     it('should have compound indexes on ReviewSchema', () => {
       const indexes = ReviewSchema.indexes();
-      
+
       // Check for compound index on userId and pointId
       expect(indexes).toContainEqual([
         { userId: 1, pointId: 1 },
-        expect.any(Object)
+        expect.any(Object),
       ]);
     });
   });
@@ -384,7 +390,7 @@ describe('Schemas', () => {
       });
 
       const json = user.toJSON();
-      
+
       // Password should be removed in JSON
       expect(json).not.toHaveProperty('password');
       expect(json).not.toHaveProperty('__v');

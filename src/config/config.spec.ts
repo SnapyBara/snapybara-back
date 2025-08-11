@@ -51,7 +51,7 @@ describe('Configuration', () => {
 
       // This test is more of a reminder that these env vars need to be set
       // In a real test environment, you would check if they are properly loaded
-      requiredEnvVars.forEach(envVar => {
+      requiredEnvVars.forEach((envVar) => {
         expect(typeof envVar).toBe('string');
       });
     });

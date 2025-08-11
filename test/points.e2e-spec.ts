@@ -8,7 +8,11 @@ import { SupabaseAuthGuard } from '../src/auth/guards/supabase-auth.guard';
 import { TestAuthGuard } from '../src/auth/guards/test-auth.guard';
 import { SupabaseService } from '../src/supabase/supabase.service';
 import { UsersService } from '../src/users/users.service';
-import { mockSupabaseService, mockCacheManager, mockUsersService } from './test-config';
+import {
+  mockSupabaseService,
+  mockCacheManager,
+  mockUsersService,
+} from './test-config';
 
 describe('Points API (e2e)', () => {
   let app: INestApplication;
@@ -44,14 +48,16 @@ describe('Points API (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }));
-    
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
+      }),
+    );
+
     await app.init();
 
     // Create a test JWT service and token
@@ -59,7 +65,7 @@ describe('Points API (e2e)', () => {
       secret: 'test-jwt-secret',
       signOptions: { expiresIn: '1h' },
     });
-    
+
     // Create a test token
     authToken = jwtService.sign({
       sub: 'test-user-id',
@@ -238,7 +244,7 @@ describe('Points API (e2e)', () => {
         console.warn('Skipping test: createdPointId is undefined');
         return;
       }
-      
+
       const response = await request(app.getHttpServer())
         .get(`/points/${createdPointId}`)
         .expect(200);
@@ -249,7 +255,7 @@ describe('Points API (e2e)', () => {
       expect(response.body).toHaveProperty('category');
       expect(response.body).toHaveProperty('latitude');
       expect(response.body).toHaveProperty('longitude');
-      
+
       // Les photos et reviews sont récupérées via des endpoints séparés
       // GET /points/:id/photos et GET /points/:id/reviews
     });
@@ -327,7 +333,7 @@ describe('Points API (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send(createPointDto)
         .expect(201);
-      
+
       pointToDelete = response.body._id;
     });
 

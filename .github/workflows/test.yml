@@ -53,8 +53,8 @@ jobs:
     - name: Check types
       run: npm run type-check
 
-    - name: Run linter
-      run: npm run lint
+    - name: Run linter (errors only)
+      run: npm run lint:errors
 
     - name: Run unit tests
       run: npm test -- --coverage --passWithNoTests

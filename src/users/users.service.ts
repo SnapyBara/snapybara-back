@@ -16,7 +16,6 @@ export class UsersService {
 
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
-
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
     try {
       const existingUser = await this.userModel.findOne({
@@ -183,7 +182,6 @@ export class UsersService {
   //   return this.update(id, { likesReceived: user.likesReceived + 1 });
   // }
 
-
   async getLeaderboard(limit = 10): Promise<UserDocument[]> {
     return this.userModel
       .find({ isActive: true })
@@ -220,17 +218,13 @@ export class UsersService {
 
   async updateRole(id: string, role: string): Promise<UserDocument | null> {
     const user = await this.userModel
-      .findByIdAndUpdate(
-        id,
-        { role, updatedAt: new Date() },
-        { new: true },
-      )
+      .findByIdAndUpdate(id, { role, updatedAt: new Date() }, { new: true })
       .exec();
 
     if (user) {
       this.logger.log(`User role updated: ${user.username} is now ${role}`);
     }
-    
+
     return user;
   }
 

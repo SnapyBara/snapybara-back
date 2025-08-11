@@ -169,11 +169,9 @@ describe('PointsController', () => {
 
       mockPointsService.update.mockResolvedValueOnce(mockUpdatedPoint);
 
-      const result = await controller.update(
-        pointId,
-        updatePointDto,
-        { user: { id: 'test-user-id' } },
-      );
+      const result = await controller.update(pointId, updatePointDto, {
+        user: { id: 'test-user-id' },
+      });
 
       expect(result).toEqual(mockUpdatedPoint);
       expect(mockPointsService.update).toHaveBeenCalledWith(
@@ -233,7 +231,11 @@ describe('PointsController', () => {
       const result = await controller.getNearby(48.8566, 2.3522, 1);
 
       expect(result).toEqual(mockNearbyPoints);
-      expect(mockPointsService.findNearby).toHaveBeenCalledWith(48.8566, 2.3522, 1);
+      expect(mockPointsService.findNearby).toHaveBeenCalledWith(
+        48.8566,
+        2.3522,
+        1,
+      );
     });
   });
 
@@ -262,11 +264,13 @@ describe('PointsController', () => {
       const result = await controller.searchHybrid(searchDto);
 
       expect(result).toEqual(mockSearchResults);
-      expect(mockPointsService.searchHybrid).toHaveBeenCalledWith(expect.objectContaining({
-        ...searchDto,
-        includeGooglePlaces: false,
-        includeOpenStreetMap: true,
-      }));
+      expect(mockPointsService.searchHybrid).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...searchDto,
+          includeGooglePlaces: false,
+          includeOpenStreetMap: true,
+        }),
+      );
     });
   });
 
@@ -284,13 +288,15 @@ describe('PointsController', () => {
         photos: ['photo-123'],
       };
 
-      mockPointsService.uploadPhotoForPoint = jest.fn().mockResolvedValueOnce(mockUpdatedPoint);
+      mockPointsService.uploadPhotoForPoint = jest
+        .fn()
+        .mockResolvedValueOnce(mockUpdatedPoint);
 
       const result = await controller.uploadPointPhoto(
         pointId,
         mockFile,
         { caption: 'Test photo' },
-        { user: { id: 'test-user-id' } }
+        { user: { id: 'test-user-id' } },
       );
 
       expect(result).toEqual(mockUpdatedPoint);
@@ -298,7 +304,7 @@ describe('PointsController', () => {
         pointId,
         mockFile,
         { caption: 'Test photo' },
-        'test-user-id'
+        'test-user-id',
       );
     });
   });
@@ -318,24 +324,25 @@ describe('PointsController', () => {
         ...createDto,
       };
 
-      mockPointsService.createWithPhotos = jest.fn().mockResolvedValueOnce(mockCreatedPoint);
+      mockPointsService.createWithPhotos = jest
+        .fn()
+        .mockResolvedValueOnce(mockCreatedPoint);
 
-      const result = await controller.createWithPhotos(
-        createDto,
-        { user: { id: 'test-user-id' } }
-      );
+      const result = await controller.createWithPhotos(createDto, {
+        user: { id: 'test-user-id' },
+      });
 
       expect(result).toEqual(mockCreatedPoint);
       expect(mockPointsService.createWithPhotos).toHaveBeenCalledWith(
         createDto,
-        'test-user-id'
+        'test-user-id',
       );
     });
   });
 
   describe('importFromGooglePlaces', () => {
     it('should import places from Google Places', async () => {
-      const importDto = { 
+      const importDto = {
         latitude: 48.8566,
         longitude: 2.3522,
         radiusKm: 1,
@@ -347,7 +354,9 @@ describe('PointsController', () => {
         errors: 2,
       };
 
-      mockPointsService.importFromGooglePlaces = jest.fn().mockResolvedValueOnce(mockResult);
+      mockPointsService.importFromGooglePlaces = jest
+        .fn()
+        .mockResolvedValueOnce(mockResult);
 
       const result = await controller.importFromGooglePlaces(importDto);
 
@@ -356,7 +365,7 @@ describe('PointsController', () => {
         48.8566,
         2.3522,
         1,
-        20
+        20,
       );
     });
   });
@@ -369,7 +378,9 @@ describe('PointsController', () => {
         { id: '2', name: 'User Point 2' },
       ];
 
-      mockPointsService.findByUser = jest.fn().mockResolvedValueOnce(mockPoints);
+      mockPointsService.findByUser = jest
+        .fn()
+        .mockResolvedValueOnce(mockPoints);
 
       const result = await controller.getByUser(userId);
 
@@ -386,7 +397,9 @@ describe('PointsController', () => {
         { id: 'photo-2', url: 'https://example.com/photo2.jpg' },
       ];
 
-      mockPointsService.getPointPhotos = jest.fn().mockResolvedValueOnce(mockPhotos);
+      mockPointsService.getPointPhotos = jest
+        .fn()
+        .mockResolvedValueOnce(mockPhotos);
 
       const result = await controller.getPointPhotos(pointId);
 
@@ -423,7 +436,9 @@ describe('PointsController', () => {
         { id: '1', name: 'Pending 1', status: 'pending' },
       ];
 
-      mockPointsService.getPendingPoints = jest.fn().mockResolvedValueOnce(mockPendingPoints);
+      mockPointsService.getPendingPoints = jest
+        .fn()
+        .mockResolvedValueOnce(mockPendingPoints);
 
       const result = await controller.getPendingPoints(1, 20);
 
@@ -438,18 +453,19 @@ describe('PointsController', () => {
         status: 'approved',
       };
 
-      mockPointsService.updatePointStatus = jest.fn().mockResolvedValueOnce(mockApprovedPoint);
+      mockPointsService.updatePointStatus = jest
+        .fn()
+        .mockResolvedValueOnce(mockApprovedPoint);
 
-      const result = await controller.approvePoint(
-        pointId,
-        { user: { id: 'admin-id' } }
-      );
+      const result = await controller.approvePoint(pointId, {
+        user: { id: 'admin-id' },
+      });
 
       expect(result).toEqual(mockApprovedPoint);
       expect(mockPointsService.updatePointStatus).toHaveBeenCalledWith(
         pointId,
         'approved',
-        'admin-id'
+        'admin-id',
       );
     });
   });

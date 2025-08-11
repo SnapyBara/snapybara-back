@@ -34,7 +34,7 @@ export class SentryInterceptor implements NestInterceptor {
 
         const isHttpError = error instanceof HttpException;
         const status = isHttpError ? error.getStatus() : 500;
-        
+
         if (!isHttpError || status >= 500) {
           Sentry.captureException(error, {
             tags: {

@@ -351,7 +351,12 @@ export class PointsController {
     @Request() req,
   ) {
     // TODO: Add admin role check
-    return this.pointsService.updatePointStatus(id, 'rejected', req.user.id, reason);
+    return this.pointsService.updatePointStatus(
+      id,
+      'rejected',
+      req.user.id,
+      reason,
+    );
   }
 
   @Delete('admin/:id')
@@ -494,7 +499,7 @@ export class PointsController {
     console.log('Creating review for point:', id);
     console.log('Review data:', body);
     console.log('User ID:', req.user.id);
-    
+
     const result = await this.reviewsService.create(
       {
         pointId: id,
@@ -503,7 +508,7 @@ export class PointsController {
       },
       req.user.id,
     );
-    
+
     console.log('Review created:', result);
     return result;
   }

@@ -77,7 +77,7 @@ describe('JwtStrategy', () => {
       mockAuthService.validateUserById.mockResolvedValue(null);
 
       await expect(strategy.validate(payload)).rejects.toThrow(
-        new UnauthorizedException('Invalid token payload')
+        new UnauthorizedException('Invalid token payload'),
       );
     });
 
@@ -88,11 +88,11 @@ describe('JwtStrategy', () => {
       };
 
       mockAuthService.validateUserById.mockRejectedValue(
-        new UnauthorizedException('User account is deactivated')
+        new UnauthorizedException('User account is deactivated'),
       );
 
       await expect(strategy.validate(payload)).rejects.toThrow(
-        new UnauthorizedException('Invalid token payload')
+        new UnauthorizedException('Invalid token payload'),
       );
     });
 

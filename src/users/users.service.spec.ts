@@ -52,7 +52,7 @@ describe('UsersService', () => {
 
       service['userModel'] = Object.assign(jest.fn(), {
         findOne: jest.fn().mockResolvedValue(null),
-        prototype: { save: saveMock }
+        prototype: { save: saveMock },
       }) as any;
 
       const result = await service.create(mockUser as any);
@@ -62,18 +62,21 @@ describe('UsersService', () => {
 
     it('should throw ConflictException if exists', async () => {
       service['userModel'] = Object.assign(jest.fn(), {
-        findOne: jest.fn().mockResolvedValue(mockUser)
+        findOne: jest.fn().mockResolvedValue(mockUser),
       }) as any;
 
-      await expect(service.create(mockUser as any)).rejects.toThrow(ConflictException);
+      await expect(service.create(mockUser as any)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
-
 
   describe('findAll', () => {
     it('should return active users sorted by points', async () => {
       const execMock = jest.fn().mockResolvedValue([mockUser]);
-      model.find.mockReturnValue({ sort: () => ({ limit: () => ({ skip: () => ({ exec: execMock }) }) }) });
+      model.find.mockReturnValue({
+        sort: () => ({ limit: () => ({ skip: () => ({ exec: execMock }) }) }),
+      });
       const result = await service.findAll();
       expect(result).toEqual([mockUser]);
     });
@@ -81,33 +84,45 @@ describe('UsersService', () => {
 
   describe('findOne', () => {
     it('should return a user', async () => {
-      model.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(mockUser) });
+      model.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      });
       const result = await service.findOne('123');
       expect(result).toEqual(mockUser);
     });
 
     it('should throw NotFoundException if not found', async () => {
-      model.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
+      model.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
       await expect(service.findOne('123')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('update', () => {
     it('should update a user', async () => {
-      model.findByIdAndUpdate.mockReturnValue({ exec: jest.fn().mockResolvedValue(mockUser) });
+      model.findByIdAndUpdate.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      });
       const result = await service.update('123', { username: 'new' } as any);
       expect(result).toEqual(mockUser);
     });
 
     it('should throw NotFoundException if not found', async () => {
-      model.findByIdAndUpdate.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
-      await expect(service.update('123', {} as any)).rejects.toThrow(NotFoundException);
+      model.findByIdAndUpdate.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      await expect(service.update('123', {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
   describe('addPoints', () => {
     it('should add points and update level', async () => {
-      jest.spyOn(service, 'findOne').mockResolvedValue({ ...mockUser, achievements: [] } as any);
+      jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue({ ...mockUser, achievements: [] } as any);
       jest.spyOn(service, 'update').mockResolvedValue(mockUser as any);
       const result = await service.addPoints('123', 50);
       expect(result).toEqual(mockUser);
@@ -116,7 +131,9 @@ describe('UsersService', () => {
 
   describe('addAchievement', () => {
     it('should add achievement if not already present', async () => {
-      jest.spyOn(service, 'findOne').mockResolvedValue({ ...mockUser, achievements: [] } as any);
+      jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue({ ...mockUser, achievements: [] } as any);
       jest.spyOn(service, 'update').mockResolvedValue(mockUser as any);
       const result = await service.addAchievement('123', 'ach1');
       expect(result).toEqual(mockUser);
@@ -125,7 +142,9 @@ describe('UsersService', () => {
 
   describe('updateRole', () => {
     it('should update user role', async () => {
-      model.findByIdAndUpdate.mockReturnValue({ exec: jest.fn().mockResolvedValue(mockUser) });
+      model.findByIdAndUpdate.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      });
       const result = await service.updateRole('123', 'admin');
       expect(result).toEqual(mockUser);
     });
@@ -134,32 +153,52 @@ describe('UsersService', () => {
   describe('remove', () => {
     it('should delete a user', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValue(mockUser as any);
-      model.findByIdAndDelete.mockReturnValue({ exec: jest.fn().mockResolvedValue(mockUser) });
+      model.findByIdAndDelete.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      });
       await service.remove('123');
       expect(model.findByIdAndDelete).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if delete fails', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValue(mockUser as any);
-      model.findByIdAndDelete.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
+      model.findByIdAndDelete.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
       await expect(service.remove('123')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('syncWithSupabase', () => {
     it('should update existing user', async () => {
-      jest.spyOn(service, 'findBySupabaseId').mockResolvedValue(mockUser as any);
+      jest
+        .spyOn(service, 'findBySupabaseId')
+        .mockResolvedValue(mockUser as any);
       jest.spyOn(service, 'update').mockResolvedValue(mockUser as any);
-      const result = await service.syncWithSupabase({ id: 'supabase123', email: 't@t.com', user_metadata: {} });
+      const result = await service.syncWithSupabase({
+        id: 'supabase123',
+        email: 't@t.com',
+        user_metadata: {},
+      });
       expect(result).toEqual(mockUser);
     });
 
     it('should create new user if not exists', async () => {
       jest.spyOn(service, 'findBySupabaseId').mockResolvedValue(null);
-      jest.spyOn<any, any>(service, 'generateUniqueUsername').mockResolvedValue('uniqueName');
-      jest.spyOn(service, 'create').mockResolvedValue({ ...mockUser, _id: '123' } as any);
-      jest.spyOn<any, any>(service, 'giveWelcomeRewards').mockResolvedValue(undefined);
-      const result = await service.syncWithSupabase({ id: 'supabase123', email: 't@t.com', user_metadata: {} });
+      jest
+        .spyOn<any, any>(service, 'generateUniqueUsername')
+        .mockResolvedValue('uniqueName');
+      jest
+        .spyOn(service, 'create')
+        .mockResolvedValue({ ...mockUser, _id: '123' } as any);
+      jest
+        .spyOn<any, any>(service, 'giveWelcomeRewards')
+        .mockResolvedValue(undefined);
+      const result = await service.syncWithSupabase({
+        id: 'supabase123',
+        email: 't@t.com',
+        user_metadata: {},
+      });
       expect(result.username).toBeDefined();
     });
   });

@@ -37,9 +37,9 @@ describe('AppController', () => {
   describe('getHealth', () => {
     it('should return health status', () => {
       const res = mockResponse();
-      
+
       appController.getHealth(res);
-      
+
       expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
       expect(res.json).toHaveBeenCalledWith({
         status: 'OK',
@@ -54,9 +54,9 @@ describe('AppController', () => {
   describe('getApiInfo', () => {
     it('should return API information', () => {
       const res = mockResponse();
-      
+
       appController.getApiInfo(res);
-      
+
       expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
       expect(res.json).toHaveBeenCalledWith({
         name: 'SnapyBara API',
@@ -76,12 +76,16 @@ describe('AppController', () => {
   describe('getDocs', () => {
     it('should return HTML documentation', () => {
       const res = mockResponse();
-      
+
       appController.getDocs(res);
-      
+
       expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
-      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('<!DOCTYPE html>'));
-      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('SnapyBara API'));
+      expect(res.send).toHaveBeenCalledWith(
+        expect.stringContaining('<!DOCTYPE html>'),
+      );
+      expect(res.send).toHaveBeenCalledWith(
+        expect.stringContaining('SnapyBara API'),
+      );
     });
   });
 
@@ -92,20 +96,20 @@ describe('AppController', () => {
         token: 'test-token',
         type: 'recovery',
       };
-      
+
       appController.legacyPasswordResetRedirect(query, res);
-      
+
       expect(res.redirect).toHaveBeenCalledWith(
-        '/email/reset-password-form?token=test-token&type=recovery'
+        '/email/reset-password-form?token=test-token&type=recovery',
       );
     });
 
     it('should handle empty query params', () => {
       const res = mockResponse();
       const query = {};
-      
+
       appController.legacyPasswordResetRedirect(query, res);
-      
+
       expect(res.redirect).toHaveBeenCalledWith('/email/reset-password-form?');
     });
   });

@@ -45,19 +45,22 @@ expect.extend({
     const pass = received >= floor && received <= ceiling;
     if (pass) {
       return {
-        message: () => `expected ${received} not to be within range ${floor} - ${ceiling}`,
+        message: () =>
+          `expected ${received} not to be within range ${floor} - ${ceiling}`,
         pass: true,
       };
     } else {
       return {
-        message: () => `expected ${received} to be within range ${floor} - ${ceiling}`,
+        message: () =>
+          `expected ${received} to be within range ${floor} - ${ceiling}`,
         pass: false,
       };
     }
   },
-  
+
   toHaveValidId(received: any) {
-    const pass = received && typeof received.id === 'string' && received.id.length > 0;
+    const pass =
+      received && typeof received.id === 'string' && received.id.length > 0;
     if (pass) {
       return {
         message: () => `expected ${received} not to have a valid id`,
@@ -70,7 +73,7 @@ expect.extend({
       };
     }
   },
-  
+
   toBeValidJWT(received: string) {
     const jwtRegex = /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]*$/;
     const pass = jwtRegex.test(received);
@@ -200,4 +203,5 @@ export const cleanDatabase = async () => {
 };
 
 // Wait helper for async operations
-export const waitFor = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export const waitFor = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));

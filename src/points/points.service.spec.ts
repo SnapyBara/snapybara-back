@@ -74,7 +74,10 @@ describe('PointsService', () => {
         { provide: GooglePlacesService, useValue: mockGooglePlacesService },
         { provide: UploadService, useValue: mockUploadService },
         { provide: OverpassService, useValue: mockOverpassService },
-        { provide: PhotoEnrichmentService, useValue: mockPhotoEnrichmentService },
+        {
+          provide: PhotoEnrichmentService,
+          useValue: mockPhotoEnrichmentService,
+        },
         { provide: UsersService, useValue: mockUsersService },
       ],
     }).compile();
@@ -112,7 +115,9 @@ describe('PointsService', () => {
       mockPointModel.mockImplementationOnce(() => mockCreatedPoint);
 
       const result = await service.create(createPointDto, 'supabase-user-123');
-      expect(mockUsersService.findBySupabaseId).toHaveBeenCalledWith('supabase-user-123');
+      expect(mockUsersService.findBySupabaseId).toHaveBeenCalledWith(
+        'supabase-user-123',
+      );
       expect(mockPointModel).toHaveBeenCalled();
       expect(mockCreatedPoint.save).toHaveBeenCalled();
     });
@@ -120,24 +125,36 @@ describe('PointsService', () => {
     it('should throw BadRequestException if user not found', async () => {
       mockUsersService.findBySupabaseId.mockResolvedValueOnce(null);
       await expect(
-        service.create({ name: 'Test', latitude: 0, longitude: 0, category: 'test' }, 'invalid-user')
+        service.create(
+          { name: 'Test', latitude: 0, longitude: 0, category: 'test' },
+          'invalid-user',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
 
   describe('findOne', () => {
     it('should return a point', async () => {
-      const mockPoint = { _id: '507f1f77bcf86cd799439011', name: 'Test Point', viewCount: 10 };
+      const mockPoint = {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'Test Point',
+        viewCount: 10,
+      };
       mockPointModel.exec.mockResolvedValueOnce(mockPoint);
 
       const result = await service.findOne('507f1f77bcf86cd799439011');
       expect(result).toEqual(mockPoint);
-      expect(mockPointModel.findByIdAndUpdate).toHaveBeenCalledWith('507f1f77bcf86cd799439011', { $inc: { viewCount: 1 } });
+      expect(mockPointModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        '507f1f77bcf86cd799439011',
+        { $inc: { viewCount: 1 } },
+      );
     });
 
     it('should throw NotFoundException for non-existent point', async () => {
       mockPointModel.exec.mockResolvedValueOnce(null);
-      await expect(service.findOne('507f1f77bcf86cd799439011')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('507f1f77bcf86cd799439011')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -154,9 +171,15 @@ describe('PointsService', () => {
 
   describe('update', () => {
     it('should update a point', async () => {
-      const updateDto = { name: 'Updated Name', description: 'Updated Description' };
+      const updateDto = {
+        name: 'Updated Name',
+        description: 'Updated Description',
+      };
       const mockUser = { _id: new Types.ObjectId(), username: 'testuser' };
-      const mockPoint = { _id: '507f1f77bcf86cd799439011', userId: mockUser._id };
+      const mockPoint = {
+        _id: '507f1f77bcf86cd799439011',
+        userId: mockUser._id,
+      };
       const mockUpdatedPoint = { ...mockPoint, ...updateDto };
 
       mockUsersService.findBySupabaseId.mockResolvedValueOnce(mockUser);
@@ -166,20 +189,36 @@ describe('PointsService', () => {
         exec: jest.fn().mockResolvedValueOnce(mockUpdatedPoint),
       });
 
-      const result = await service.update('507f1f77bcf86cd799439011', updateDto, 'user-123');
+      const result = await service.update(
+        '507f1f77bcf86cd799439011',
+        updateDto,
+        'user-123',
+      );
       expect(result).toEqual(mockUpdatedPoint);
     });
 
     it('should throw BadRequestException if user not found', async () => {
       mockUsersService.findBySupabaseId.mockResolvedValueOnce(null);
-      await expect(service.update('507f1f77bcf86cd799439011', { name: 'New Name' }, 'user-123')).rejects.toThrow(BadRequestException);
+      await expect(
+        service.update(
+          '507f1f77bcf86cd799439011',
+          { name: 'New Name' },
+          'user-123',
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw NotFoundException if point not found', async () => {
       const mockUser = { _id: new Types.ObjectId() };
       mockUsersService.findBySupabaseId.mockResolvedValueOnce(mockUser);
       mockPointModel.findById.mockResolvedValueOnce(null);
-      await expect(service.update('507f1f77bcf86cd799439011', { name: 'New Name' }, 'user-123')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.update(
+          '507f1f77bcf86cd799439011',
+          { name: 'New Name' },
+          'user-123',
+        ),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -195,12 +234,12 @@ describe('PointsService', () => {
       };
 
       const mockMongoResults = [
-        { 
-          name: 'Mongo Restaurant', 
+        {
+          name: 'Mongo Restaurant',
           source: 'mongodb',
           latitude: 48.8566,
           longitude: 2.3522,
-          metadata: {}
+          metadata: {},
         },
       ];
 
@@ -231,7 +270,12 @@ describe('PointsService', () => {
         latitude: 48.8566,
         longitude: 2.3522,
         category: 'restaurant' as any,
-        photos: [{ imageData: 'https://example.com/photo1.jpg', caption: 'Test photo' }],
+        photos: [
+          {
+            imageData: 'https://example.com/photo1.jpg',
+            caption: 'Test photo',
+          },
+        ],
       };
       const supabaseUserId = 'user-123';
       const mockUser = { _id: new Types.ObjectId() };
@@ -260,7 +304,10 @@ describe('PointsService', () => {
         mediumUrl: '',
         metadata: {},
       });
-      mockPhotosService.create.mockResolvedValueOnce({ _id: 'photo-123', url: 'https://storage.example.com/photo.jpg' });
+      mockPhotosService.create.mockResolvedValueOnce({
+        _id: 'photo-123',
+        url: 'https://storage.example.com/photo.jpg',
+      });
 
       const result = await service.createWithPhotos(createDto, supabaseUserId);
       expect(result).toHaveProperty('point');
@@ -272,7 +319,11 @@ describe('PointsService', () => {
     it('should upload photo for a point', async () => {
       const pointId = '507f1f77bcf86cd799439011';
       const supabaseUserId = 'user-123';
-      const mockFile = { buffer: Buffer.from('test'), originalname: 'test.jpg', mimetype: 'image/jpeg' } as Express.Multer.File;
+      const mockFile = {
+        buffer: Buffer.from('test'),
+        originalname: 'test.jpg',
+        mimetype: 'image/jpeg',
+      } as Express.Multer.File;
       const metadata = { caption: 'Test photo' };
       const mockPoint = { _id: pointId, name: 'Test Point' };
       const mockUser = { _id: 'mongo-user-123' };
@@ -289,7 +340,12 @@ describe('PointsService', () => {
       mockPhotosService.uploadPhoto.mockResolvedValueOnce(mockUploadedPhoto);
       mockPointModel.findByIdAndUpdate.mockResolvedValueOnce({});
 
-      const result = await service.uploadPhotoForPoint(pointId, mockFile, metadata, supabaseUserId);
+      const result = await service.uploadPhotoForPoint(
+        pointId,
+        mockFile,
+        metadata,
+        supabaseUserId,
+      );
       expect(mockPhotosService.uploadPhoto).toHaveBeenCalledWith(
         mockFile,
         { pointId, caption: metadata.caption, tags: [], isPublic: true },

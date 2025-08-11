@@ -116,7 +116,12 @@ describe('CollectionsController', () => {
         limit: 10,
       });
 
-      await controller.findAll(filters.userId, filters.isPublic, filters.page, filters.limit);
+      await controller.findAll(
+        filters.userId,
+        filters.isPublic,
+        filters.page,
+        filters.limit,
+      );
 
       expect(service.findAll).toHaveBeenCalledWith(filters);
     });
@@ -146,16 +151,14 @@ describe('CollectionsController', () => {
         pointsCount: 1,
       });
 
-      const result = await controller.addPoint(
-        collectionId,
-        pointId,
-        { user: mockUser }
-      );
+      const result = await controller.addPoint(collectionId, pointId, {
+        user: mockUser,
+      });
 
       expect(service.addPoint).toHaveBeenCalledWith(
         collectionId,
         pointId,
-        mockUser.id
+        mockUser.id,
       );
       expect(result.points).toContain(pointId);
     });
@@ -168,16 +171,14 @@ describe('CollectionsController', () => {
 
       mockCollectionsService.removePoint.mockResolvedValue(mockCollection);
 
-      const result = await controller.removePoint(
-        collectionId,
-        pointId,
-        { user: mockUser }
-      );
+      const result = await controller.removePoint(collectionId, pointId, {
+        user: mockUser,
+      });
 
       expect(service.removePoint).toHaveBeenCalledWith(
         collectionId,
         pointId,
-        mockUser.id
+        mockUser.id,
       );
       expect(result).toEqual(mockCollection);
     });
@@ -189,14 +190,13 @@ describe('CollectionsController', () => {
 
       mockCollectionsService.isPointInUserCollections.mockResolvedValue(true);
 
-      const result = await controller.isPointInCollection(
-        pointId,
-        { user: mockUser }
-      );
+      const result = await controller.isPointInCollection(pointId, {
+        user: mockUser,
+      });
 
       expect(service.isPointInUserCollections).toHaveBeenCalledWith(
         pointId,
-        mockUser.id
+        mockUser.id,
       );
       expect(result).toBe(true);
     });
@@ -206,13 +206,15 @@ describe('CollectionsController', () => {
     it('should remove point from default collection', async () => {
       const pointId = 'point-123';
 
-      mockCollectionsService.removeFromDefaultCollection.mockResolvedValue(undefined);
+      mockCollectionsService.removeFromDefaultCollection.mockResolvedValue(
+        undefined,
+      );
 
       await controller.removeFromCollection(pointId, { user: mockUser });
 
       expect(service.removeFromDefaultCollection).toHaveBeenCalledWith(
         pointId,
-        mockUser.id
+        mockUser.id,
       );
     });
   });
@@ -224,14 +226,13 @@ describe('CollectionsController', () => {
 
       mockCollectionsService.toggleFollow.mockResolvedValue(followResult);
 
-      const result = await controller.toggleFollow(
-        collectionId,
-        { user: mockUser }
-      );
+      const result = await controller.toggleFollow(collectionId, {
+        user: mockUser,
+      });
 
       expect(service.toggleFollow).toHaveBeenCalledWith(
         collectionId,
-        mockUser.id
+        mockUser.id,
       );
       expect(result).toEqual(followResult);
     });

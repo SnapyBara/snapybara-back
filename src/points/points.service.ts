@@ -639,7 +639,9 @@ export class PointsService {
    * Recherche hybride : MongoDB d'abord, puis OpenStreetMap/Overpass pour combler les manques
    * Avec option pour inclure Google Places en mode premium
    */
-  async searchHybrid(searchDto: SearchPointsDto & { includeGooglePlaces?: boolean }): Promise<{
+  async searchHybrid(
+    searchDto: SearchPointsDto & { includeGooglePlaces?: boolean },
+  ): Promise<{
     data: PointOfInterest[];
     total: number;
     page: number;
@@ -687,11 +689,7 @@ export class PointsService {
     // 2. Si pas assez de résultats et qu'on a des coordonnées
     const remainingSlots = effectiveLimit - mongoResults.data.length;
 
-    if (
-      remainingSlots > 0 &&
-      searchDto.latitude &&
-      searchDto.longitude
-    ) {
+    if (remainingSlots > 0 && searchDto.latitude && searchDto.longitude) {
       // 2.1 Si Google Places est activé (mode premium), l'utiliser en priorité
       if (searchDto.includeGooglePlaces === true && remainingSlots > 0) {
         this.logger.debug(
@@ -699,7 +697,10 @@ export class PointsService {
         );
 
         try {
-          const googleResults = await this.searchGooglePlaces(searchDto, remainingSlots);
+          const googleResults = await this.searchGooglePlaces(
+            searchDto,
+            remainingSlots,
+          );
 
           for (const googlePlace of googleResults) {
             if (finalResults.length >= effectiveLimit) break;
@@ -736,7 +737,8 @@ export class PointsService {
             if (isDuplicate) continue;
 
             // Convertir le lieu Google en PointOfInterest
-            const convertedPlace = this.googlePlacesService.convertToPointOfInterest(googlePlace);
+            const convertedPlace =
+              this.googlePlacesService.convertToPointOfInterest(googlePlace);
 
             const poiData = {
               ...convertedPlace,
@@ -744,7 +746,10 @@ export class PointsService {
               id: new Types.ObjectId().toString(),
               location: {
                 type: 'Point',
-                coordinates: [convertedPlace.longitude, convertedPlace.latitude],
+                coordinates: [
+                  convertedPlace.longitude,
+                  convertedPlace.latitude,
+                ],
               },
               userId: null,
               isPublic: true,
@@ -765,7 +770,9 @@ export class PointsService {
             googleCount++;
           }
 
-          this.logger.debug(`Added ${googleCount} unique POIs from Google Places`);
+          this.logger.debug(
+            `Added ${googleCount} unique POIs from Google Places`,
+          );
         } catch (error) {
           this.logger.error('Error fetching Google Places results:', error);
         }
@@ -1479,9 +1486,7 @@ export class PointsService {
 
     await this.pointModel.findByIdAndDelete(id);
 
-    this.logger.log(
-      `Point ${id} permanently deleted by admin ${adminUserId}`,
-    );
+    this.logger.log(`Point ${id} permanently deleted by admin ${adminUserId}`);
   }
 
   /**
@@ -1557,7 +1562,7 @@ export class PointsService {
       rejectedToday,
       totalPOIs,
       activeUsers: activeUsers.length,
-      recentSubmissions: recentSubmissions.map(submission => ({
+      recentSubmissions: recentSubmissions.map((submission) => ({
         id: submission._id,
         name: submission.name,
         submittedBy: submission.userId

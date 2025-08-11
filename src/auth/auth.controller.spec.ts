@@ -106,7 +106,9 @@ describe('AuthController', () => {
 
       const result = await controller.refreshToken(refreshDto);
 
-      expect(authService.refreshToken).toHaveBeenCalledWith('old-refresh-token');
+      expect(authService.refreshToken).toHaveBeenCalledWith(
+        'old-refresh-token',
+      );
       expect(result).toEqual(mockResult);
     });
 
@@ -117,7 +119,9 @@ describe('AuthController', () => {
         new Error('Invalid refresh token'),
       );
 
-      await expect(controller.refreshToken(refreshDto)).rejects.toThrow(HttpException);
+      await expect(controller.refreshToken(refreshDto)).rejects.toThrow(
+        HttpException,
+      );
     });
   });
 
@@ -362,9 +366,7 @@ describe('AuthController', () => {
     it('should throw error if Google auth not configured', async () => {
       (controller as any).googleClient = null;
 
-      await expect(
-        controller.googleAuth({ idToken: 'token' }),
-      ).rejects.toThrow(
+      await expect(controller.googleAuth({ idToken: 'token' })).rejects.toThrow(
         new HttpException(
           'Google authentication is not configured',
           HttpStatus.SERVICE_UNAVAILABLE,
@@ -374,7 +376,7 @@ describe('AuthController', () => {
 
     it('should throw error on invalid Google token', async () => {
       const googleAuthDto = { idToken: 'invalid-token' };
-      
+
       mockGoogleVerify.mockRejectedValue(new Error('Invalid token'));
 
       await expect(controller.googleAuth(googleAuthDto)).rejects.toThrow(

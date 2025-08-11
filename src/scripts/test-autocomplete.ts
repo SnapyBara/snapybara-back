@@ -1,8 +1,6 @@
 import * as dotenv from 'dotenv';
 import { GooglePlacesService } from '../google-places/google-places.service';
-import { CacheService } from '../cache/cache.service';
 import { ConfigService } from '@nestjs/config';
-import { Logger } from '@nestjs/common';
 
 // Mock du CacheService pour les tests
 class MockCacheService {

@@ -8,14 +8,17 @@ describe('Auth Decorators', () => {
   describe('Public Decorator', () => {
     it('should set metadata with isPublic = true', () => {
       const decorator = Public();
-      
+
       // Apply decorator to a test class method
       class TestClass {
         @decorator
         testMethod() {}
       }
-      
-      const metadata = Reflect.getMetadata('isPublic', TestClass.prototype.testMethod);
+
+      const metadata = Reflect.getMetadata(
+        'isPublic',
+        TestClass.prototype.testMethod,
+      );
       expect(metadata).toBe(true);
     });
   });
@@ -24,14 +27,17 @@ describe('Auth Decorators', () => {
     it('should set metadata with roles array', () => {
       const roles = ['admin', 'moderator'];
       const decorator = Roles(...roles);
-      
+
       // Apply decorator to a test class method
       class TestClass {
         @decorator
         testMethod() {}
       }
-      
-      const metadata = Reflect.getMetadata('roles', TestClass.prototype.testMethod);
+
+      const metadata = Reflect.getMetadata(
+        'roles',
+        TestClass.prototype.testMethod,
+      );
       expect(metadata).toEqual(roles);
     });
   });

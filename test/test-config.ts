@@ -3,12 +3,12 @@ export const mockSupabaseService = {
   getClient: jest.fn().mockReturnValue({
     auth: {
       getUser: jest.fn().mockResolvedValue({
-        data: { 
-          user: { 
-            id: 'test-user-id', 
+        data: {
+          user: {
+            id: 'test-user-id',
             email: 'test@example.com',
-            user_metadata: { username: 'testuser' }
-          } 
+            user_metadata: { username: 'testuser' },
+          },
         },
         error: null,
       }),
@@ -38,7 +38,9 @@ export const mockEmailService = {
 
 export const mockNotificationService = {
   sendNotification: jest.fn().mockResolvedValue(true),
-  createNotification: jest.fn().mockResolvedValue({ id: 'test-notification-id' }),
+  createNotification: jest
+    .fn()
+    .mockResolvedValue({ id: 'test-notification-id' }),
 };
 
 export const mockUsersService = {

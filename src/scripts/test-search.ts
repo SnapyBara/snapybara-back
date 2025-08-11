@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { PointsService } from '../points/points.service';
 import { GooglePlacesService } from '../google-places/google-places.service';
-import { POICategory } from '../points/dto/create-point.dto';
 
 async function testSearch() {
   const app = await NestFactory.createApplicationContext(AppModule);

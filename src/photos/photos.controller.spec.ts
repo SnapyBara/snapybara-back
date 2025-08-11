@@ -72,7 +72,10 @@ describe('PhotosController', () => {
       const result = await controller.create(createPhotoDto, mockRequest);
 
       expect(result).toEqual(expectedResult);
-      expect(mockPhotosService.create).toHaveBeenCalledWith(createPhotoDto, mockUser.id);
+      expect(mockPhotosService.create).toHaveBeenCalledWith(
+        createPhotoDto,
+        mockUser.id,
+      );
     });
   });
 
@@ -83,7 +86,7 @@ describe('PhotosController', () => {
         buffer: Buffer.from('test'),
         mimetype: 'image/jpeg',
       } as Express.Multer.File;
-      const uploadDto = { 
+      const uploadDto = {
         pointId: '123',
         caption: 'Test upload',
       };
@@ -97,7 +100,11 @@ describe('PhotosController', () => {
       const result = await controller.uploadPhoto(file, uploadDto, mockRequest);
 
       expect(result).toEqual(expectedResult);
-      expect(mockPhotosService.uploadPhoto).toHaveBeenCalledWith(file, uploadDto, mockUser.id);
+      expect(mockPhotosService.uploadPhoto).toHaveBeenCalledWith(
+        file,
+        uploadDto,
+        mockUser.id,
+      );
     });
   });
 
@@ -176,8 +183,16 @@ describe('PhotosController', () => {
   describe('getRecentPhotos', () => {
     it('should return recent photos', async () => {
       const expectedResult = [
-        { _id: '1', url: 'https://example.com/recent1.jpg', createdAt: new Date() },
-        { _id: '2', url: 'https://example.com/recent2.jpg', createdAt: new Date() },
+        {
+          _id: '1',
+          url: 'https://example.com/recent1.jpg',
+          createdAt: new Date(),
+        },
+        {
+          _id: '2',
+          url: 'https://example.com/recent2.jpg',
+          createdAt: new Date(),
+        },
       ];
 
       mockPhotosService.getRecentPhotos.mockResolvedValue(expectedResult);
@@ -223,7 +238,7 @@ describe('PhotosController', () => {
       expect(mockPhotosService.update).toHaveBeenCalledWith(
         photoId,
         updateDto,
-        mockUser.id
+        mockUser.id,
       );
     });
   });
@@ -231,10 +246,13 @@ describe('PhotosController', () => {
   describe('remove', () => {
     it('should remove a photo', async () => {
       const photoId = '1';
-      
+
       await controller.remove(photoId, mockRequest);
 
-      expect(mockPhotosService.remove).toHaveBeenCalledWith(photoId, mockUser.id);
+      expect(mockPhotosService.remove).toHaveBeenCalledWith(
+        photoId,
+        mockUser.id,
+      );
     });
   });
 
@@ -248,7 +266,10 @@ describe('PhotosController', () => {
       const result = await controller.toggleLike(photoId, mockRequest);
 
       expect(result).toEqual(expectedResult);
-      expect(mockPhotosService.toggleLike).toHaveBeenCalledWith(photoId, mockUser.id);
+      expect(mockPhotosService.toggleLike).toHaveBeenCalledWith(
+        photoId,
+        mockUser.id,
+      );
     });
   });
 });

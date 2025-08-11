@@ -24,9 +24,11 @@ export class UploadService {
   private readonly baseUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.uploadPath = this.configService.get<string>('UPLOAD_PATH') || './uploads';
-    this.baseUrl = this.configService.get<string>('BASE_URL') || 'http://localhost:3000';
-    
+    this.uploadPath =
+      this.configService.get<string>('UPLOAD_PATH') || './uploads';
+    this.baseUrl =
+      this.configService.get<string>('BASE_URL') || 'http://localhost:3000';
+
     // Create upload directories if they don't exist
     this.ensureUploadDirectories();
   }
@@ -39,7 +41,7 @@ export class UploadService {
       path.join(this.uploadPath, 'large'),
     ];
 
-    directories.forEach(dir => {
+    directories.forEach((dir) => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
@@ -65,7 +67,7 @@ export class UploadService {
       await sharp(file.buffer)
         .resize(200, 200, {
           fit: 'cover',
-          position: 'center'
+          position: 'center',
         })
         .jpeg({ quality: 80 })
         .toFile(thumbnailPath);
@@ -75,7 +77,7 @@ export class UploadService {
       await sharp(file.buffer)
         .resize(800, 800, {
           fit: 'inside',
-          withoutEnlargement: true
+          withoutEnlargement: true,
         })
         .jpeg({ quality: 85 })
         .toFile(mediumPath);
@@ -85,7 +87,7 @@ export class UploadService {
       await sharp(file.buffer)
         .resize(1920, 1920, {
           fit: 'inside',
-          withoutEnlargement: true
+          withoutEnlargement: true,
         })
         .jpeg({ quality: 90 })
         .toFile(largePath);
@@ -110,7 +112,7 @@ export class UploadService {
 
   async deleteImage(filename: string): Promise<void> {
     const sizes = ['original', 'thumbnail', 'medium', 'large'];
-    
+
     for (const size of sizes) {
       const filePath = path.join(this.uploadPath, size, filename);
       if (fs.existsSync(filePath)) {
@@ -119,7 +121,10 @@ export class UploadService {
     }
   }
 
-  getImagePath(filename: string, size: 'original' | 'thumbnail' | 'medium' | 'large' = 'original'): string {
+  getImagePath(
+    filename: string,
+    size: 'original' | 'thumbnail' | 'medium' | 'large' = 'original',
+  ): string {
     return path.join(this.uploadPath, size, filename);
   }
 }

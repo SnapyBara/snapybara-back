@@ -48,7 +48,9 @@ describe('CollectionsService', () => {
     }).compile();
 
     service = module.get<CollectionsService>(CollectionsService);
-    model = module.get<Model<CollectionDocument>>(getModelToken(Collection.name));
+    model = module.get<Model<CollectionDocument>>(
+      getModelToken(Collection.name),
+    );
     jest.clearAllMocks();
   });
 
@@ -88,7 +90,7 @@ describe('CollectionsService', () => {
           name: 'Mes favoris',
           isDefault: true,
           points: [expect.any(Types.ObjectId)],
-        })
+        }),
       );
     });
   });
@@ -145,7 +147,7 @@ describe('CollectionsService', () => {
   describe('findOne', () => {
     it('should return a collection by id', async () => {
       const collectionId = new Types.ObjectId().toString();
-      
+
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(mockCollection),
@@ -161,7 +163,7 @@ describe('CollectionsService', () => {
 
     it('should throw BadRequestException for invalid id', async () => {
       await expect(service.findOne('invalid-id')).rejects.toThrow(
-        BadRequestException
+        BadRequestException,
       );
     });
 
@@ -174,7 +176,7 @@ describe('CollectionsService', () => {
       mockCollectionModel.findById.mockReturnValue(mockQuery);
 
       await expect(
-        service.findOne(new Types.ObjectId().toString())
+        service.findOne(new Types.ObjectId().toString()),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -184,7 +186,7 @@ describe('CollectionsService', () => {
       const collectionId = 'collection-123';
       const pointId = new Types.ObjectId().toString();
       const userId = 'user-123';
-      
+
       const collection = {
         ...mockCollection,
         points: [],
@@ -203,7 +205,7 @@ describe('CollectionsService', () => {
       const collectionId = 'collection-123';
       const existingPointId = new Types.ObjectId();
       const userId = 'user-123';
-      
+
       const collection = {
         ...mockCollection,
         points: [existingPointId],
@@ -222,7 +224,7 @@ describe('CollectionsService', () => {
       mockCollectionModel.findById.mockResolvedValue(collection);
 
       await expect(
-        service.addPoint('collection-123', 'point-123', 'user-123')
+        service.addPoint('collection-123', 'point-123', 'user-123'),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -232,7 +234,7 @@ describe('CollectionsService', () => {
       const collectionId = 'collection-123';
       const pointId = new Types.ObjectId();
       const userId = 'user-123';
-      
+
       const collection = {
         ...mockCollection,
         points: [pointId],
@@ -244,7 +246,7 @@ describe('CollectionsService', () => {
       const result = await service.removePoint(
         collectionId,
         pointId.toString(),
-        userId
+        userId,
       );
 
       expect(collection.save).toHaveBeenCalled();
@@ -274,7 +276,7 @@ describe('CollectionsService', () => {
 
       const result = await service.isPointInUserCollections(
         new Types.ObjectId().toString(),
-        'user-123'
+        'user-123',
       );
 
       expect(result).toBe(false);
@@ -285,7 +287,11 @@ describe('CollectionsService', () => {
     it('should follow a collection', async () => {
       const collectionId = 'collection-123';
       const userId = 'user-456';
-      const collection = { ...mockCollection, followers: [], followersCount: 0 };
+      const collection = {
+        ...mockCollection,
+        followers: [],
+        followersCount: 0,
+      };
 
       mockCollectionModel.findById.mockResolvedValue(collection);
       mockCollectionModel.findByIdAndUpdate.mockResolvedValue({});
@@ -298,7 +304,7 @@ describe('CollectionsService', () => {
         {
           $addToSet: { followers: userId },
           $inc: { followersCount: 1 },
-        }
+        },
       );
     });
 
@@ -322,7 +328,7 @@ describe('CollectionsService', () => {
         {
           $pull: { followers: userId },
           $inc: { followersCount: -1 },
-        }
+        },
       );
     });
   });
@@ -342,7 +348,7 @@ describe('CollectionsService', () => {
           isDefault: true,
           userId,
           points: [expect.any(Types.ObjectId)],
-        })
+        }),
       );
     });
 
@@ -392,8 +398,8 @@ describe('CollectionsService', () => {
       await expect(
         service.removeFromDefaultCollection(
           new Types.ObjectId().toString(),
-          'user-123'
-        )
+          'user-123',
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });

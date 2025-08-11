@@ -57,7 +57,9 @@ async function testCache() {
     radius: 5000,
   });
   const time1 = Date.now() - start1;
-  console.log(`✅ ${result1.length} lieux trouvés en ${time1}ms (première requête)`);
+  console.log(
+    `✅ ${result1.length} lieux trouvés en ${time1}ms (première requête)`,
+  );
 
   const start2 = Date.now();
   const result2 = await googlePlacesService.nearbySearch({
@@ -66,8 +68,12 @@ async function testCache() {
     radius: 5000,
   });
   const time2 = Date.now() - start2;
-  console.log(`✅ ${result2.length} lieux trouvés en ${time2}ms (depuis le cache)`);
-  console.log(`⚡ Amélioration de performance: ${Math.round(((time1 - time2) / time1) * 100)}%\n`);
+  console.log(
+    `✅ ${result2.length} lieux trouvés en ${time2}ms (depuis le cache)`,
+  );
+  console.log(
+    `⚡ Amélioration de performance: ${Math.round(((time1 - time2) / time1) * 100)}%\n`,
+  );
 
   const start3 = Date.now();
   const auto1 = await googlePlacesService.getAutocomplete({
@@ -77,8 +83,10 @@ async function testCache() {
   });
   const time3 = Date.now() - start3;
   console.log(`\n📍 Autocomplétion:`);
-  console.log(`✅ ${auto1.predictions.length} suggestions trouvées en ${time3}ms (première requête)`);
-  
+  console.log(
+    `✅ ${auto1.predictions.length} suggestions trouvées en ${time3}ms (première requête)`,
+  );
+
   const start4 = Date.now();
   const auto2 = await googlePlacesService.getAutocomplete({
     input: 'Mont',

@@ -169,7 +169,9 @@ describe('UsersService Extended Tests', () => {
           .mockResolvedValueOnce(null),
       });
 
-      const result = await (service as any).generateUniqueUsername(supabaseUser);
+      const result = await (service as any).generateUniqueUsername(
+        supabaseUser,
+      );
       expect(result).toBe('johndoe2');
     });
   });

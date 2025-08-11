@@ -61,7 +61,8 @@ const MockSupabaseService = {
       useFactory: () => ({
         supabaseUrl: process.env.SUPABASE_URL || 'https://test.supabase.co',
         supabaseKey: process.env.SUPABASE_ANON_KEY || 'test-anon-key',
-        supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-key',
+        supabaseServiceKey:
+          process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-key',
         supabaseOptions: {
           auth: {
             persistSession: false,

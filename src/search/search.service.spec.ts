@@ -93,21 +93,21 @@ describe('SearchService', () => {
   describe('globalSearch', () => {
     it('should search all entities', async () => {
       const query = 'test';
-      
+
       const mockUserQuery = {
         limit: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         lean: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue([mockUser]),
       };
-      
+
       const mockPointQuery = {
         limit: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         lean: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue([mockPoint]),
       };
-      
+
       const mockCollectionQuery = {
         limit: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
@@ -139,10 +139,7 @@ describe('SearchService', () => {
 
       expect(mockUserModel.find).toHaveBeenCalledWith({
         isActive: true,
-        $or: [
-          { username: expect.any(RegExp) },
-          { email: expect.any(RegExp) },
-        ],
+        $or: [{ username: expect.any(RegExp) }, { email: expect.any(RegExp) }],
       });
 
       expect(mockPointModel.find).toHaveBeenCalledWith({
@@ -169,7 +166,7 @@ describe('SearchService', () => {
     it('should filter by types', async () => {
       const query = 'test';
       const filters = { types: ['points'], limit: 10 };
-      
+
       const mockPointQuery = {
         limit: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
@@ -276,7 +273,7 @@ describe('SearchService', () => {
       expect(mockPointModel.find).toHaveBeenCalledWith(
         expect.objectContaining({
           category: { $in: filters.categories },
-        })
+        }),
       );
     });
   });
@@ -284,15 +281,14 @@ describe('SearchService', () => {
   describe('searchSuggestions', () => {
     it('should return suggestions for valid query', async () => {
       const query = 'par';
-      
+
       const mockQuery = {
         limit: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         lean: jest.fn().mockReturnThis(),
-        exec: jest.fn().mockResolvedValue([
-          { name: 'Paris' },
-          { name: 'Park' },
-        ]),
+        exec: jest
+          .fn()
+          .mockResolvedValue([{ name: 'Paris' }, { name: 'Park' }]),
       };
 
       mockPointModel.find.mockReturnValue(mockQuery);

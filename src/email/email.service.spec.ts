@@ -62,7 +62,9 @@ describe('EmailService', () => {
         error: null,
       };
 
-      mockSupabaseService.getClient().auth.signInWithOtp.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.signInWithOtp.mockResolvedValueOnce(mockResponse);
 
       const result = await service.sendEmailConfirmation(email);
 
@@ -70,7 +72,9 @@ describe('EmailService', () => {
         success: true,
         message: 'Email de confirmation envoyé avec succès',
       });
-      expect(mockSupabaseService.getClient().auth.signInWithOtp).toHaveBeenCalledWith({
+      expect(
+        mockSupabaseService.getClient().auth.signInWithOtp,
+      ).toHaveBeenCalledWith({
         email,
       });
     });
@@ -82,13 +86,15 @@ describe('EmailService', () => {
         error: { message: 'Error sending OTP' },
       };
 
-      mockSupabaseService.getClient().auth.signInWithOtp.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.signInWithOtp.mockResolvedValueOnce(mockResponse);
 
       const result = await service.sendEmailConfirmation(email);
 
       expect(result).toEqual({
         success: false,
-        message: 'Erreur lors de l\'envoi: Error sending OTP',
+        message: "Erreur lors de l'envoi: Error sending OTP",
       });
     });
   });
@@ -101,7 +107,9 @@ describe('EmailService', () => {
         error: null,
       };
 
-      mockSupabaseService.getClient().auth.resetPasswordForEmail.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.resetPasswordForEmail.mockResolvedValueOnce(mockResponse);
 
       const result = await service.sendPasswordResetEmail(email);
 
@@ -109,7 +117,9 @@ describe('EmailService', () => {
         success: true,
         message: 'Email de réinitialisation envoyé avec succès',
       });
-      expect(mockSupabaseService.getClient().auth.resetPasswordForEmail).toHaveBeenCalledWith(email, {
+      expect(
+        mockSupabaseService.getClient().auth.resetPasswordForEmail,
+      ).toHaveBeenCalledWith(email, {
         redirectTo: expect.stringContaining('/reset-password'),
       });
     });
@@ -121,13 +131,15 @@ describe('EmailService', () => {
         error: { message: 'User not found' },
       };
 
-      mockSupabaseService.getClient().auth.resetPasswordForEmail.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.resetPasswordForEmail.mockResolvedValueOnce(mockResponse);
 
       const result = await service.sendPasswordResetEmail(email);
 
       expect(result).toEqual({
         success: false,
-        message: 'Erreur lors de l\'envoi: User not found',
+        message: "Erreur lors de l'envoi: User not found",
       });
     });
   });
@@ -140,12 +152,16 @@ describe('EmailService', () => {
         error: null,
       };
 
-      mockSupabaseService.getClient().auth.verifyOtp.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.verifyOtp.mockResolvedValueOnce(mockResponse);
 
       const result = await service.confirmEmailWithSupabase(tokenHash);
 
       expect(result).toBe(true);
-      expect(mockSupabaseService.getClient().auth.verifyOtp).toHaveBeenCalledWith({
+      expect(
+        mockSupabaseService.getClient().auth.verifyOtp,
+      ).toHaveBeenCalledWith({
         token_hash: tokenHash,
         type: 'email',
       });
@@ -158,7 +174,9 @@ describe('EmailService', () => {
         error: { message: 'Invalid token' },
       };
 
-      mockSupabaseService.getClient().auth.verifyOtp.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.verifyOtp.mockResolvedValueOnce(mockResponse);
 
       const result = await service.confirmEmailWithSupabase(tokenHash);
 
@@ -174,7 +192,9 @@ describe('EmailService', () => {
         error: null,
       };
 
-      mockSupabaseService.getClient().auth.verifyOtp.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.verifyOtp.mockResolvedValueOnce(mockResponse);
 
       const result = await service.verifyPasswordResetToken(tokenHash);
 
@@ -182,7 +202,9 @@ describe('EmailService', () => {
         success: true,
         message: 'Token de réinitialisation valide',
       });
-      expect(mockSupabaseService.getClient().auth.verifyOtp).toHaveBeenCalledWith({
+      expect(
+        mockSupabaseService.getClient().auth.verifyOtp,
+      ).toHaveBeenCalledWith({
         token_hash: tokenHash,
         type: 'recovery',
       });
@@ -195,7 +217,9 @@ describe('EmailService', () => {
         error: { message: 'Invalid token' },
       };
 
-      mockSupabaseService.getClient().auth.verifyOtp.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.verifyOtp.mockResolvedValueOnce(mockResponse);
 
       const result = await service.verifyPasswordResetToken(tokenHash);
 
@@ -214,12 +238,16 @@ describe('EmailService', () => {
         error: null,
       };
 
-      mockSupabaseService.getClient().auth.getUser.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.getUser.mockResolvedValueOnce(mockResponse);
 
       const result = await service.verifyAccessToken(accessToken);
 
       expect(result).toBe(true);
-      expect(mockSupabaseService.getClient().auth.getUser).toHaveBeenCalledWith(accessToken);
+      expect(mockSupabaseService.getClient().auth.getUser).toHaveBeenCalledWith(
+        accessToken,
+      );
     });
 
     it('should return false for invalid access token', async () => {
@@ -229,7 +257,9 @@ describe('EmailService', () => {
         error: { message: 'Invalid token' },
       };
 
-      mockSupabaseService.getClient().auth.getUser.mockResolvedValueOnce(mockResponse);
+      mockSupabaseService
+        .getClient()
+        .auth.getUser.mockResolvedValueOnce(mockResponse);
 
       const result = await service.verifyAccessToken(accessToken);
 

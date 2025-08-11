@@ -150,7 +150,6 @@ export class CacheService {
     return key;
   }
 
-
   generatePlaceDetailsKey(placeId: string): string {
     return `${this.PREFIXES.GOOGLE_PLACES_DETAILS}${placeId}`;
   }
@@ -329,7 +328,6 @@ export class CacheService {
     return {
       type: 'memory',
       status: 'active',
-
     };
   }
 }
