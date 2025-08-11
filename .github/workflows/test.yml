@@ -56,6 +56,15 @@ jobs:
     - name: Run linter (errors only)
       run: npm run lint:errors
 
+    - name: Check Jest configuration
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
+        echo "Jest config exists: $(test -f jest.config.js && echo 'yes' || echo 'no')"
+        echo "TypeScript config exists: $(test -f tsconfig.json && echo 'yes' || echo 'no')"
+        ls -la
+        
     - name: Run unit tests
       run: npm test -- --coverage --passWithNoTests
       env:
