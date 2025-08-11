@@ -36,15 +36,12 @@ async function testCache() {
     },
   } as unknown as Cache;
 
-  // Mock du ConfigService
   const configService = {
     get: (key: string, defaultValue?: any) => process.env[key] || defaultValue,
   } as ConfigService;
 
-  // Créer le service de cache
   const cacheService = new CacheService(cacheManager);
 
-  // Créer le service Google Places avec cache
   const googlePlacesService = new GooglePlacesService(
     configService,
     cacheService,
