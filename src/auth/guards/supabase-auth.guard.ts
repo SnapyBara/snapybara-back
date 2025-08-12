@@ -19,7 +19,6 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    console.log('Token extracted:', token.substring(0, 20) + '...');
 
     try {
       const {
@@ -27,19 +26,13 @@ export class SupabaseAuthGuard implements CanActivate {
         error,
       } = await this.supabaseService.getClient().auth.getUser(token);
 
-      console.log('Supabase response - User:', user);
-      console.log('Supabase response - Error:', error);
-
       if (error || !user) {
-        console.error('Supabase validation failed:', error);
         throw new UnauthorizedException('Invalid token');
       }
 
       request.user = user;
-      console.log('User authenticated:', user.email);
       return true;
     } catch (error) {
-      console.error('Supabase authentication error:', error);
       throw new UnauthorizedException('Authentication failed');
     }
   }

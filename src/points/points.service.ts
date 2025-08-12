@@ -636,8 +636,8 @@ export class PointsService {
   }
 
   /**
-   * Recherche hybride : MongoDB d'abord, puis OpenStreetMap/Overpass pour combler les manques
-   * Avec option pour inclure Google Places en mode premium
+   * Hybrid search with mongo and another API (Overpass)
+   * Include google place api when user is prenium
    */
   async searchHybrid(
     searchDto: SearchPointsDto & { includeGooglePlaces?: boolean },
@@ -648,16 +648,10 @@ export class PointsService {
     limit: number;
     sources: { mongodb: number; openstreetmap: number; googlePlaces?: number };
   }> {
-    this.logger.debug(
-      `SearchHybrid called with includeGooglePlaces=${searchDto.includeGooglePlaces}, includeOpenStreetMap=${searchDto.includeOpenStreetMap}`,
-    );
-
     const { page = 1, limit = 20 } = searchDto;
 
-    // Limiter à 200 points maximum pour avoir un bon équilibre performance/complétude
     const effectiveLimit = Math.min(limit, 200);
 
-    // 1. Chercher d'abord dans MongoDB (priorité)
     const mongoResults = await this.findAll({
       ...searchDto,
       limit: effectiveLimit,
@@ -667,12 +661,10 @@ export class PointsService {
     let osmCount = 0;
     let googleCount = 0;
 
-    // Créer un index des positions existantes pour éviter les doublons
     const existingPositions = new Map<string, PointOfInterest>();
     const existingOsmIds = new Set<string>();
     const existingGooglePlaceIds = new Set<string>();
 
-    // Indexer les résultats MongoDB par position et OSM ID
     mongoResults.data.forEach((point) => {
       const posKey = `${point.latitude.toFixed(6)}_${point.longitude.toFixed(6)}`;
       existingPositions.set(posKey, point);
@@ -686,11 +678,9 @@ export class PointsService {
       }
     });
 
-    // 2. Si pas assez de résultats et qu'on a des coordonnées
     const remainingSlots = effectiveLimit - mongoResults.data.length;
 
     if (remainingSlots > 0 && searchDto.latitude && searchDto.longitude) {
-      // 2.1 Si Google Places est activé (mode premium), l'utiliser en priorité
       if (searchDto.includeGooglePlaces === true && remainingSlots > 0) {
         this.logger.debug(
           `MongoDB returned ${mongoResults.data.length} results, fetching ${remainingSlots} more from Google Places (includeGooglePlaces=${searchDto.includeGooglePlaces})`,
@@ -705,7 +695,6 @@ export class PointsService {
           for (const googlePlace of googleResults) {
             if (finalResults.length >= effectiveLimit) break;
 
-            // Vérifier si ce lieu Google existe déjà
             if (existingGooglePlaceIds.has(googlePlace.place_id)) {
               this.logger.debug(
                 `Skipping Google Place ${googlePlace.place_id} - already exists in MongoDB`,
@@ -713,7 +702,6 @@ export class PointsService {
               continue;
             }
 
-            // Vérifier la proximité géographique
             const posKey = `${googlePlace.geometry.location.lat.toFixed(6)}_${googlePlace.geometry.location.lng.toFixed(6)}`;
             let isDuplicate = false;
 
@@ -736,7 +724,6 @@ export class PointsService {
 
             if (isDuplicate) continue;
 
-            // Convertir le lieu Google en PointOfInterest
             const convertedPlace =
               this.googlePlacesService.convertToPointOfInterest(googlePlace);
 
@@ -769,40 +756,29 @@ export class PointsService {
             existingGooglePlaceIds.add(googlePlace.place_id);
             googleCount++;
           }
-
-          this.logger.debug(
-            `Added ${googleCount} unique POIs from Google Places`,
-          );
         } catch (error) {
           this.logger.error('Error fetching Google Places results:', error);
         }
       }
 
-      // 2.2 Si on a encore de la place et qu'OSM est activé, compléter avec OSM
       const remainingSlotsAfterGoogle = effectiveLimit - finalResults.length;
 
       if (
         remainingSlotsAfterGoogle > 0 &&
         searchDto.includeOpenStreetMap !== false
       ) {
-        this.logger.debug(
-          `Still ${remainingSlotsAfterGoogle} slots available, fetching from OSM`,
-        );
-
         try {
-          // Utiliser le service Overpass pour récupérer des POIs OSM
           const osmResults = await this.overpassService.searchPOIs(
             searchDto.latitude,
             searchDto.longitude,
-            searchDto.radius || 3, // Rayon en km
+            searchDto.radius || 3, // Km
             searchDto.categories?.map((cat) => cat.toLowerCase()),
           );
 
-          // Filtrer les résultats OSM
+          //Filter search
           for (const osmPOI of osmResults.data || []) {
             if (finalResults.length >= effectiveLimit) break;
 
-            // Vérifier si ce POI OSM existe déjà
             if (existingOsmIds.has(osmPOI.id)) {
               this.logger.debug(
                 `Skipping OSM POI ${osmPOI.id} - already exists in MongoDB`,
@@ -810,11 +786,9 @@ export class PointsService {
               continue;
             }
 
-            // Vérifier si un POI existe déjà à cette position (tolérance de 100m)
             const posKey = `${osmPOI.lat.toFixed(6)}_${osmPOI.lon.toFixed(6)}`;
             let isDuplicate = false;
 
-            // Vérification plus stricte : chercher dans un rayon de 100m
             for (const [existingKey, existingPoint] of existingPositions) {
               const distance = this.calculateDistance(
                 osmPOI.lat,
@@ -824,7 +798,6 @@ export class PointsService {
               );
 
               if (distance < 100) {
-                // 100 mètres
                 this.logger.debug(
                   `Skipping OSM POI "${osmPOI.name}" - too close to existing "${existingPoint.name}" (${distance}m)`,
                 );
@@ -835,10 +808,8 @@ export class PointsService {
 
             if (isDuplicate) continue;
 
-            // Mapper le type OSM vers nos catégories
             const category = this.mapOSMTypeToCategory(osmPOI.type);
 
-            // Filtrer par catégorie si spécifiée
             if (searchDto.categories && searchDto.categories.length > 0) {
               const categoriesAsStrings = this.categoriesToStrings(
                 searchDto.categories,
@@ -848,7 +819,6 @@ export class PointsService {
               }
             }
 
-            // Créer un objet temporaire qui ressemble à un PointOfInterest
             const poiData = {
               _id: new Types.ObjectId(),
               id: new Types.ObjectId().toString(),
@@ -901,13 +871,10 @@ export class PointsService {
               updatedAt: new Date(),
             } as any;
 
-            // Ajouter à la liste finale et à l'index des positions
             finalResults.push(poiData);
             existingPositions.set(posKey, poiData);
             osmCount++;
           }
-
-          this.logger.debug(`Added ${osmCount} unique POIs from OpenStreetMap`);
         } catch (error) {
           this.logger.error('Error fetching OSM results:', error);
         }
@@ -928,7 +895,7 @@ export class PointsService {
   }
 
   /**
-   * Calculer la distance entre deux points en mètres
+   * Check distance between two coords
    */
   private calculateDistance(
     lat1: number,
@@ -936,7 +903,7 @@ export class PointsService {
     lat2: number,
     lon2: number,
   ): number {
-    const R = 6371e3; // Rayon de la Terre en mètres
+    const R = 6371e3;
     const φ1 = (lat1 * Math.PI) / 180;
     const φ2 = (lat2 * Math.PI) / 180;
     const Δφ = ((lat2 - lat1) * Math.PI) / 180;
@@ -951,7 +918,7 @@ export class PointsService {
   }
 
   /**
-   * Mapper les types OSM vers nos catégories
+   * Map all possible types of OSM (Check overpass docs)
    */
   private mapOSMTypeToCategory(osmType: string): string {
     const mapping: Record<string, string> = {
