@@ -30,7 +30,7 @@ export class CloudinaryUploadService {
         crop: 'fill',
         gravity: 'auto',
         quality: 'auto',
-        format: 'auto',
+        fetch_format: 'auto',
       });
 
       const mediumUrl = this.getTransformedUrl(uploadResult.public_id, {
@@ -38,7 +38,7 @@ export class CloudinaryUploadService {
         height: 800,
         crop: 'limit',
         quality: 'auto:good',
-        format: 'auto',
+        fetch_format: 'auto',
       });
 
       const largeUrl = this.getTransformedUrl(uploadResult.public_id, {
@@ -46,7 +46,7 @@ export class CloudinaryUploadService {
         height: 1920,
         crop: 'limit',
         quality: 'auto:good',
-        format: 'auto',
+        fetch_format: 'auto',
       });
 
       return {
