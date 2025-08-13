@@ -1,88 +1,71 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  HealthCheckService,
+  HealthCheck,
+  MongooseHealthIndicator,
+  MemoryHealthIndicator,
+  HealthIndicatorResult,
+} from '@nestjs/terminus';
 import { ConfigService } from '@nestjs/config';
+import * as Sentry from '@sentry/node';
 
-export class HealthResponseDto {
-  status: string;
-  timestamp: string;
-  uptime: number;
-  version: string;
-  environment: string;
-  services: {
-    database: string;
-    auth: string;
-    api: string;
-  };
-}
-
-@ApiTags('public')
+@ApiTags('health')
 @Controller('health')
 export class HealthController {
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private health: HealthCheckService,
+    private db: MongooseHealthIndicator,
+    private memory: MemoryHealthIndicator,
+    private configService: ConfigService,
+  ) {}
 
   @Get()
-  @ApiOperation({
-    summary: 'Health check',
-    description:
-      'Returns the health status of the application and its services',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Health check successful',
-    type: HealthResponseDto,
-  })
-  getHealth(): HealthResponseDto {
-    return {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      version: '1.0.0',
-      environment: this.configService.get<string>('NODE_ENV') || 'development',
-      services: {
-        database: 'supabase-connected',
-        auth: 'supabase-jwt-enabled',
-        api: 'online',
-      },
-    };
+  @HealthCheck()
+  @ApiOperation({ summary: 'Check application health' })
+  @ApiResponse({ status: 200, description: 'Application is healthy' })
+  @ApiResponse({ status: 503, description: 'Application is unhealthy' })
+  async check() {
+    try {
+      const result = await this.health.check([
+        () => this.db.pingCheck('database'),
+        () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024), // 300MB
+        () => this.memory.checkRSS('memory_rss', 500 * 1024 * 1024), // 500MB
+        () => this.checkSentry(),
+      ]);
+
+      return result;
+    } catch (error) {
+      Sentry.captureException(error);
+      throw error;
+    }
   }
 
-  @Get('ready')
-  @ApiOperation({
-    summary: 'Readiness check',
-    description: 'Returns whether the application is ready to handle requests',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Application is ready',
-  })
-  getReadiness() {
-    return {
-      status: 'ready',
-      timestamp: new Date().toISOString(),
-      checks: {
-        supabase: 'connected',
-        jwt_verification: 'enabled',
-        cors: 'configured',
-        swagger: 'enabled',
-      },
-    };
+  @Get('/liveness')
+  @ApiOperation({ summary: 'Kubernetes liveness probe' })
+  @ApiResponse({ status: 200, description: 'Service is alive' })
+  liveness() {
+    return { status: 'ok', timestamp: new Date().toISOString() };
   }
 
-  @Get('live')
-  @ApiOperation({
-    summary: 'Liveness check',
-    description: 'Returns whether the application is alive and running',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Application is alive',
-  })
-  getLiveness() {
+  @Get('/readiness')
+  @HealthCheck()
+  @ApiOperation({ summary: 'Kubernetes readiness probe' })
+  @ApiResponse({ status: 200, description: 'Service is ready' })
+  @ApiResponse({ status: 503, description: 'Service is not ready' })
+  async readiness() {
+    return this.health.check([() => this.db.pingCheck('database')]);
+  }
+
+  private async checkSentry(): Promise<HealthIndicatorResult> {
+    const sentryDsn = this.configService.get('SENTRY_DSN');
+    const isConfigured = !!sentryDsn;
+
     return {
-      status: 'alive',
-      timestamp: new Date().toISOString(),
-      pid: process.pid,
-      memory: process.memoryUsage(),
-    };
+      sentry: {
+        status: isConfigured ? 'up' : 'down',
+        configured: isConfigured,
+      },
+    } as HealthIndicatorResult;
   }
 }

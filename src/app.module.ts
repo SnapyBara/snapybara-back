@@ -1,7 +1,7 @@
 import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
@@ -25,6 +25,7 @@ import { GraphqlModule } from './graphql/graphql.module';
 import { GooglePlacesModule } from './google-places/google-places.module';
 import { CacheModule } from './cache/cache.module';
 import { OverpassModule } from './overpass/overpass.module';
+import { SentryInterceptor } from './common/interceptors/sentry.interceptor';
 
 @Module({
   imports: [
@@ -79,6 +80,10 @@ import { OverpassModule } from './overpass/overpass.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: SentryInterceptor,
     },
   ],
 })

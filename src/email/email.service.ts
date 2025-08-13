@@ -25,9 +25,6 @@ export class EmailService {
           message: `Erreur lors de l'envoi: ${error.message}`,
         };
       }
-
-      console.log('✅ Email de confirmation envoyé à:', email);
-      console.log('📧 Utilisation du template email avec URL hardcodée');
       return {
         success: true,
         message: 'Email de confirmation envoyé avec succès',
@@ -65,7 +62,6 @@ export class EmailService {
         };
       }
 
-      console.log('✅ Email de reset password envoyé à:', email);
       return {
         success: true,
         message: 'Email de réinitialisation envoyé avec succès',
@@ -121,8 +117,6 @@ export class EmailService {
           message: `Token invalide: ${error.message}`,
         };
       }
-
-      console.log('✅ Token de reset password valide pour:', data?.user?.email);
       return {
         success: true,
         message: 'Token de réinitialisation valide',
@@ -146,8 +140,6 @@ export class EmailService {
         console.error('Erreur lors de la vérification du token:', error);
         return false;
       }
-
-      console.log('Token valide pour:', data?.user?.email);
       return true;
     } catch (error) {
       console.error('Erreur lors de la vérification du token:', error);

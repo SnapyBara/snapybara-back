@@ -106,7 +106,9 @@ export class AuthService {
         await this.usersService.updateLastLogin(mongoUser._id.toString());
       }
 
-      this.logger.log(`User logged in: ${mongoUser.username} (${mongoUser.email})`);
+      this.logger.log(
+        `User logged in: ${mongoUser.username} (${mongoUser.email})`,
+      );
 
       return {
         access_token: data.session.access_token,

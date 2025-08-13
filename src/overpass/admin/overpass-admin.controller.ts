@@ -1,10 +1,5 @@
-import { Controller, Get, Post, Delete, Body, UseGuards } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { OptimizedSearchService } from '../services/optimized-search.service';
 import { QueueService, QueueMetrics } from '../services/queue.service';
 import { TileService } from '../services/tile.service';

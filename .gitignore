@@ -95,5 +95,3 @@ jspm_packages/
 # Testing
 test-results/
 playwright-report/
-
-package-lock.json

@@ -56,6 +56,11 @@ export class SupabaseWebhookController {
 
       return { success: true, message: 'Webhook processed successfully' };
     } catch (error) {
+      // Re-throw HTTP exceptions as-is
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       this.logger.error('Webhook processing failed:', error);
       throw new HttpException(
         'Webhook processing failed',
@@ -66,13 +71,7 @@ export class SupabaseWebhookController {
 
   private async handleUserSignup(supabaseUser: any) {
     try {
-      this.logger.log(`New user signup: ${supabaseUser.email}`);
-
       const mongoUser = await this.usersService.syncWithSupabase(supabaseUser);
-
-      this.logger.log(
-        `User created in MongoDB: ${mongoUser.username} (ID: ${mongoUser._id?.toString()})`,
-      );
     } catch (error) {
       this.logger.error(
         `Failed to handle user signup for ${supabaseUser.email}:`,

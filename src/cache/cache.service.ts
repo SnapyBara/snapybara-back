@@ -23,7 +23,7 @@ export class CacheService {
     OVERPASS_NOMINATIM: 'overpass:nominatim:',
   };
 
-  private readonly DEFAULT_TTL = {
+  public readonly DEFAULT_TTL = {
     SEARCH: 3600,
     DETAILS: 86400,
     PHOTOS: 604800,
@@ -149,7 +149,6 @@ export class CacheService {
 
     return key;
   }
-
 
   generatePlaceDetailsKey(placeId: string): string {
     return `${this.PREFIXES.GOOGLE_PLACES_DETAILS}${placeId}`;
@@ -329,7 +328,6 @@ export class CacheService {
     return {
       type: 'memory',
       status: 'active',
-
     };
   }
 }
