@@ -1,10 +1,10 @@
 name: Backend Tests CI
 
 on:
-  push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ develop ]
+  push:
+    branches: [ develop ]
 
 jobs:
   test:
