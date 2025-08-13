@@ -23,7 +23,7 @@ export class CacheService {
     OVERPASS_NOMINATIM: 'overpass:nominatim:',
   };
 
-  private readonly DEFAULT_TTL = {
+  public readonly DEFAULT_TTL = {
     SEARCH: 3600,
     DETAILS: 86400,
     PHOTOS: 604800,

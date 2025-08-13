@@ -109,6 +109,20 @@ jobs:
         name: backend-coverage
         fail_ci_if_error: false
 
+    - name: SonarQube Scan
+      if: matrix.node-version == '20.x'
+      uses: SonarSource/sonarqube-scan-action@v2
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      with:
+        args: >
+          -Dsonar.projectKey=snapybara-back
+          -Dsonar.sources=src
+          -Dsonar.tests=test
+          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+          -Dsonar.testExecutionReportPaths=coverage/test-reporter.xml
+
     - name: Archive test results
       if: always()
       uses: actions/upload-artifact@v4

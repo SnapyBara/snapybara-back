@@ -9,6 +9,7 @@ import { Photo, PhotoDocument } from './schemas/photo.schema';
 import { CreatePhotoDto, UploadPhotoDto } from './dto/create-photo.dto';
 import { UpdatePhotoDto } from './dto/update-photo.dto';
 import { UploadService } from '../upload/upload.service';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class PhotosService {
@@ -16,6 +17,7 @@ export class PhotosService {
     @InjectModel(Photo.name)
     private photoModel: Model<PhotoDocument>,
     private uploadService: UploadService,
+    private usersService: UsersService,
   ) {}
 
   async create(
@@ -253,5 +255,29 @@ export class PhotosService {
       await this.uploadService.deleteImage(uploadedFile.filename);
       throw error;
     }
+  }
+
+  async findBySupabaseUserId(
+    supabaseUserId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: Photo[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    // Trouver l'utilisateur MongoDB à partir du supabaseId
+    const user = await this.usersService.findBySupabaseId(supabaseUserId);
+    if (!user || !user._id) {
+      return { data: [], total: 0, page, limit };
+    }
+
+    // Utiliser l'ID MongoDB pour chercher les photos
+    return this.findAll({
+      userId: user._id.toString(),
+      page,
+      limit,
+    });
   }
 }

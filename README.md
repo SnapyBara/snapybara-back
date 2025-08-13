@@ -1,5 +1,7 @@
 ![SnapyBara_head.png](uploads/logo/SnapyBara_head.png)
 
+[![codecov](https://codecov.io/gh/SnapyBara/snapybara-back/graph/badge.svg?token=KQIV86G1Z0)](https://codecov.io/gh/SnapyBara/snapybara-back)
+
 # SnapyBara Backend
 
 REST and GraphQL API backend for SnapyBara application, built with NestJS.

@@ -21,6 +21,7 @@ import { Photo } from '../photos/schemas/photo.schema';
 import { OverpassService } from '../overpass/overpass.service';
 import { PhotoEnrichmentService } from '../overpass/photo-enrichment.service';
 import { UsersService } from '../users/users.service';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class PointsService {
@@ -35,6 +36,7 @@ export class PointsService {
     private overpassService: OverpassService,
     private photoEnrichmentService: PhotoEnrichmentService,
     private usersService: UsersService,
+    private cacheService: CacheService,
   ) {}
 
   /**
@@ -64,7 +66,7 @@ export class PointsService {
         type: 'Point',
         coordinates: [createPointDto.longitude, createPointDto.latitude],
       },
-      userId: user._id, // Utiliser l'ObjectId MongoDB
+      userId: user._id,
       status: 'pending',
       statistics: {
         averageRating: 0,
@@ -73,7 +75,13 @@ export class PointsService {
         totalLikes: 0,
       },
     });
-    return createdPoint.save();
+    const savedPoint = await createdPoint.save();
+    await this.invalidateAreaCache(
+      createPointDto.latitude,
+      createPointDto.longitude,
+      10,
+    );
+    return savedPoint;
   }
 
   /**
@@ -470,6 +478,20 @@ export class PointsService {
       throw new BadRequestException('Invalid point ID');
     }
 
+    // Générer la clé de cache pour ce POI
+    const cacheKey = `${this.cacheService['PREFIXES'].POINTS_DETAILS}${id}`;
+
+    // Vérifier le cache
+    const cachedPoint = await this.cacheService.get<PointOfInterest>(cacheKey);
+    if (cachedPoint) {
+      this.logger.debug(`Cache HIT for point details: ${id}`);
+
+      // Incrémenter le compteur de vues de manière asynchrone
+      this.pointModel.findByIdAndUpdate(id, { $inc: { viewCount: 1 } }).exec();
+
+      return cachedPoint;
+    }
+
     const point = await this.pointModel
       .findById(id)
       .populate('userId', 'username profilePicture')
@@ -479,7 +501,15 @@ export class PointsService {
       throw new NotFoundException('Point not found');
     }
 
+    // Incrémenter le compteur de vues
     await this.pointModel.findByIdAndUpdate(id, { $inc: { viewCount: 1 } });
+
+    // Sauvegarder en cache
+    await this.cacheService.set(cacheKey, point, {
+      ttl: this.cacheService['DEFAULT_TTL'].DETAILS,
+    });
+
+    this.logger.debug(`Cache SET for point details: ${id}`);
 
     return point;
   }
@@ -541,6 +571,13 @@ export class PointsService {
     if (!updated) {
       throw new NotFoundException('Point not found');
     }
+
+    // Invalider le cache pour ce POI spécifique
+    const detailsCacheKey = `${this.cacheService['PREFIXES'].POINTS_DETAILS}${id}`;
+    await this.cacheService.del(detailsCacheKey);
+
+    // Invalider le cache de recherche pour cette zone
+    await this.invalidateAreaCache(updated.latitude, updated.longitude, 10);
 
     return updated;
   }
@@ -649,6 +686,27 @@ export class PointsService {
     sources: { mongodb: number; openstreetmap: number; googlePlaces?: number };
   }> {
     const { page = 1, limit = 20 } = searchDto;
+
+    // Générer une clé de cache unique pour cette recherche
+    const cacheKey = this.generateSearchCacheKey(searchDto);
+
+    // Vérifier le cache
+    const cachedResult = await this.cacheService.get<{
+      data: PointOfInterest[];
+      total: number;
+      page: number;
+      limit: number;
+      sources: {
+        mongodb: number;
+        openstreetmap: number;
+        googlePlaces?: number;
+      };
+    }>(cacheKey);
+
+    if (cachedResult) {
+      this.logger.debug(`Cache HIT for searchHybrid: ${cacheKey}`);
+      return cachedResult;
+    }
 
     const effectiveLimit = Math.min(limit, 200);
 
@@ -881,7 +939,7 @@ export class PointsService {
       }
     }
 
-    return {
+    const result = {
       data: finalResults.slice(0, effectiveLimit),
       total: mongoResults.total + osmCount + googleCount,
       page,
@@ -892,6 +950,15 @@ export class PointsService {
         ...(googleCount > 0 && { googlePlaces: googleCount }),
       },
     };
+
+    // Sauvegarder en cache
+    await this.cacheService.set(cacheKey, result, {
+      ttl: this.cacheService.DEFAULT_TTL.SEARCH,
+    });
+
+    this.logger.debug(`Cache SET for searchHybrid: ${cacheKey}`);
+
+    return result;
   }
 
   /**
@@ -952,7 +1019,7 @@ export class PointsService {
   }
 
   /**
-   * Générer une description depuis les tags OSM
+   * generate description from OSM
    */
   private generateDescription(osmPOI: any): string {
     const parts: string[] = [];
@@ -977,7 +1044,7 @@ export class PointsService {
   }
 
   /**
-   * Extraire des tags pertinents depuis OSM
+   * extracts tags from osm
    */
   private extractTags(osmPOI: any): string[] {
     const tags: string[] = [];
@@ -989,11 +1056,11 @@ export class PointsService {
     if (osmPOI.tags['heritage']) tags.push('patrimoine');
     if (osmPOI.tags['wikipedia']) tags.push('wikipedia');
 
-    return [...new Set(tags)]; // Dédupliquer
+    return [...new Set(tags)];
   }
 
   /**
-   * Recherche dans Google Places
+   * Seach in google place
    */
   private async searchGooglePlaces(
     searchDto: SearchPointsDto,
@@ -1005,13 +1072,11 @@ export class PointsService {
       return [];
     }
 
-    // S'assurer que le rayon ne dépasse pas 50km (limite Google Places)
     const safeRadius = Math.min(radius, 50);
-    const radiusInMeters = safeRadius * 1000; // Convertir km en mètres
+    const radiusInMeters = safeRadius * 1000;
 
     let results: any[] = [];
 
-    // Si on cherche spécifiquement dans la catégorie montagne, ajouter des mots-clés pertinents
     const categoriesAsStrings = this.categoriesToStrings(searchDto.categories);
 
     if (categoriesAsStrings?.includes('mountain')) {
@@ -1027,7 +1092,6 @@ export class PointsService {
       }
     }
 
-    // Recherche textuelle si un terme de recherche est fourni
     if (search) {
       const textResults = await this.googlePlacesService.textSearch({
         query: search,
@@ -1038,7 +1102,6 @@ export class PointsService {
       results = results.concat(textResults);
     }
 
-    // Recherche à proximité pour compléter
     if (results.length < limit) {
       const nearbyResults = await this.googlePlacesService.nearbySearch({
         latitude,
@@ -1047,7 +1110,6 @@ export class PointsService {
         keyword: search,
       });
 
-      // Éviter les doublons
       const existingPlaceIds = new Set(results.map((r) => r.place_id));
       const uniqueNearbyResults = nearbyResults.filter(
         (r) => !existingPlaceIds.has(r.place_id),
@@ -1056,7 +1118,6 @@ export class PointsService {
       results = results.concat(uniqueNearbyResults);
     }
 
-    // Si on cherche des lieux naturels et qu'on a peu de résultats, faire une recherche spécifique
     if (results.length < limit / 2) {
       const natureKeywords = [
         'viewpoint',
@@ -1082,7 +1143,6 @@ export class PointsService {
       }
     }
 
-    // Dédupliquer une dernière fois
     const uniqueResults = Array.from(
       new Map(results.map((item) => [item.place_id, item])).values(),
     );
@@ -1091,14 +1151,13 @@ export class PointsService {
   }
 
   /**
-   * Filtrer les lieux OSM qui existent déjà dans MongoDB
+   * Filter place on osm
    */
   private async filterExistingPlaces(osmResults: any): Promise<any[]> {
     if (!osmResults?.data || osmResults.data.length === 0) return [];
 
     const osmPOIs = osmResults.data;
 
-    // Rechercher dans MongoDB par osmId dans les métadonnées
     const osmIds = osmPOIs.map((poi) => poi.id);
 
     const existingPlaces = await this.pointModel
@@ -1111,18 +1170,12 @@ export class PointsService {
     const existingOsmIds = new Set(
       existingPlaces.map((place) => place.metadata?.osmId),
     );
-
-    // Filtrer aussi par proximité géographique pour éviter les doublons
     const filtered: any[] = [];
 
     for (const poi of osmPOIs) {
-      // Skip si déjà existant par OSM ID
       if (existingOsmIds.has(poi.id)) {
         continue;
       }
-
-      // Vérifier la proximité géographique (éviter les doublons à moins de 100m)
-      // Utiliser une requête aggregate au lieu de $near dans un $or
       const nearbyExisting = await this.pointModel.aggregate([
         {
           $geoNear: {
@@ -1148,7 +1201,7 @@ export class PointsService {
   }
 
   /**
-   * Obtenir les détails d'un lieu depuis Google Places et l'ajouter optionnellement à MongoDB
+   * Obtains details from place with google place api
    */
   async getPlaceFromGooglePlaces(
     placeId: string,
@@ -1281,24 +1334,47 @@ export class PointsService {
     // Limiter à 5 POI à la fois pour éviter les timeouts
     const poisToProcess = pois.slice(0, 5);
 
-    // TODO: Ajouter le cache ici quand CacheService sera injecté
-    // Pour l'instant, on enrichit directement
+    // Vérifier le cache pour chaque POI
+    const uncachedPois: any[] = [];
+    for (const poi of poisToProcess) {
+      const cacheKey = `${this.cacheService['PREFIXES'].GOOGLE_PLACES_PHOTOS}poi:${poi.id}`;
+      const cachedPhotos = await this.cacheService.get<any[]>(cacheKey);
+
+      if (cachedPhotos) {
+        this.logger.debug(`Cache HIT for POI photos: ${poi.id}`);
+        result[poi.id] = cachedPhotos;
+      } else {
+        uncachedPois.push(poi);
+      }
+    }
+
+    if (uncachedPois.length === 0) {
+      return result;
+    }
 
     try {
-      // Enrichir les POI avec le service
+      // Enrichir les POI non cachés avec le service
       const enrichedPOIs =
-        await this.photoEnrichmentService.enrichPOIsWithPhotos(poisToProcess);
+        await this.photoEnrichmentService.enrichPOIsWithPhotos(uncachedPois);
 
-      // Extraire les photos pour chaque POI
+      // Extraire les photos pour chaque POI et les mettre en cache
       for (const poi of enrichedPOIs) {
         if (poi.photos && poi.photos.length > 0) {
-          result[poi.id] = poi.photos.map((photo) => ({
+          const photos = poi.photos.map((photo) => ({
             reference: photo.url,
             url: photo.url,
             width: photo.width || 800,
             height: photo.height || 600,
             attribution: photo.attribution,
           }));
+
+          result[poi.id] = photos;
+
+          // Mettre en cache les photos pour ce POI
+          const cacheKey = `${this.cacheService['PREFIXES'].GOOGLE_PLACES_PHOTOS}poi:${poi.id}`;
+          await this.cacheService.set(cacheKey, photos, {
+            ttl: this.cacheService['DEFAULT_TTL'].PHOTOS, // Cache plus long pour les photos (7 jours)
+          });
         }
       }
 
@@ -1541,6 +1617,74 @@ export class PointsService {
         createdAt: submission.createdAt,
       })),
     };
+  }
+
+  /**
+   * Generate a unique cache key for search queries
+   */
+  private generateSearchCacheKey(
+    searchDto: SearchPointsDto & { includeGooglePlaces?: boolean },
+  ): string {
+    const {
+      latitude,
+      longitude,
+      radius,
+      categories,
+      search,
+      page,
+      limit,
+      minRating,
+      hasPhotos,
+      tags,
+      sortBy,
+      includeGooglePlaces,
+      includeOpenStreetMap,
+    } = searchDto;
+
+    // Round coordinates to reduce cache key variations
+    const lat = latitude ? Math.round(latitude * 1000) / 1000 : 0;
+    const lng = longitude ? Math.round(longitude * 1000) / 1000 : 0;
+
+    let key = `${this.cacheService['PREFIXES'].POINTS_SEARCH}hybrid:${lat},${lng}`;
+
+    if (radius) key += `:r${radius}`;
+    if (categories?.length) {
+      const sortedCategories = [...categories].sort();
+      key += `:c${sortedCategories.join(',')}`;
+    }
+    if (search) key += `:s${search.toLowerCase().replace(/\s+/g, '_')}`;
+    if (minRating) key += `:mr${minRating}`;
+    if (hasPhotos !== undefined) key += `:hp${hasPhotos}`;
+    if (tags?.length) {
+      const sortedTags = [...tags].sort();
+      key += `:t${sortedTags.join(',')}`;
+    }
+    if (sortBy) key += `:sb${sortBy}`;
+    if (includeGooglePlaces) key += ':gp';
+    if (includeOpenStreetMap === false) key += ':no-osm';
+
+    // Add pagination
+    key += `:p${page || 1}-${limit || 20}`;
+
+    return key;
+  }
+
+  /**
+   * Invalidate cache for a specific area when new POI is added
+   */
+  private async invalidateAreaCache(
+    latitude: number,
+    longitude: number,
+    radiusKm: number = 10,
+  ): Promise<void> {
+    // For now, we'll just log this action
+    // In a production environment with Redis, we would implement pattern-based deletion
+    this.logger.debug(
+      `Cache invalidation requested for area: ${latitude},${longitude} with radius ${radiusKm}km`,
+    );
+
+    // TODO: Implement cache invalidation strategy when using Redis
+    // For example: await this.cacheService.invalidateAreaCache(latitude, longitude, radiusKm);
   }
 
   /**
