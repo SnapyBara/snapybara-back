@@ -94,12 +94,17 @@ export class PhotosController {
   @Get()
   @ApiOperation({ summary: 'Get all photos' })
   @ApiResponse({ status: 200, description: 'Photos retrieved successfully' })
-  findAll(
+  async findAll(
     @Query('pointId') pointId?: string,
     @Query('userId') userId?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
+    // Si userId est fourni et n'est pas un ObjectId valide, c'est probablement un supabaseId
+    if (userId && !userId.match(/^[0-9a-fA-F]{24}$/)) {
+      return this.photosService.findBySupabaseUserId(userId, page, limit);
+    }
+
     return this.photosService.findAll({ pointId, userId, page, limit });
   }
 

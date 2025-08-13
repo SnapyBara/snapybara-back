@@ -44,7 +44,6 @@ export class ReviewsService {
 
     const savedReview = await createdReview.save();
 
-    // Mettre à jour les statistiques du point
     await this.updatePointStatistics(createReviewDto.pointId);
 
     return savedReview;
@@ -59,7 +58,6 @@ export class ReviewsService {
       });
     } catch (error) {
       console.error('Error updating point statistics:', error);
-      // Ne pas faire échouer l'ajout de la review si la mise à jour des stats échoue
     }
   }
 

@@ -15,9 +15,11 @@ export class CollectionsService {
   ) {}
 
   async create(createCollectionDto: any, userId: string): Promise<Collection> {
-
     if (createCollectionDto.pointId && !createCollectionDto.name) {
-      console.log('Adding to default collection with pointId:', createCollectionDto.pointId);
+      console.log(
+        'Adding to default collection with pointId:',
+        createCollectionDto.pointId,
+      );
       return this.addToDefaultCollection(createCollectionDto.pointId, userId);
     }
 
@@ -28,8 +30,10 @@ export class CollectionsService {
     return createdCollection.save();
   }
 
-  async addToDefaultCollection(pointId: string, userId: string): Promise<Collection> {
-
+  async addToDefaultCollection(
+    pointId: string,
+    userId: string,
+  ): Promise<Collection> {
     if (!Types.ObjectId.isValid(pointId)) {
       console.log('pointId is invalid:', pointId);
       throw new BadRequestException('Invalid point ID');
@@ -174,7 +178,10 @@ export class CollectionsService {
     return collection;
   }
 
-  async isPointInUserCollections(pointId: string, userId: string): Promise<boolean> {
+  async isPointInUserCollections(
+    pointId: string,
+    userId: string,
+  ): Promise<boolean> {
     if (!Types.ObjectId.isValid(pointId)) {
       throw new BadRequestException('Invalid point ID');
     }
@@ -188,7 +195,10 @@ export class CollectionsService {
     return !!collection;
   }
 
-  async removeFromDefaultCollection(pointId: string, userId: string): Promise<void> {
+  async removeFromDefaultCollection(
+    pointId: string,
+    userId: string,
+  ): Promise<void> {
     if (!Types.ObjectId.isValid(pointId)) {
       throw new BadRequestException('Invalid point ID');
     }

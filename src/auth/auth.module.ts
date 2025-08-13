@@ -26,19 +26,19 @@ import { UsersModule } from '../users/users.module';
   ],
   controllers: [AuthController],
   providers: [
-    AuthService, 
+    AuthService,
     JwtStrategy,
     JwtAuthGuard,
     SimpleJwtAuthGuard,
     RolesGuard,
-    OwnerGuard
+    OwnerGuard,
   ],
   exports: [
     AuthService,
     JwtAuthGuard,
     SimpleJwtAuthGuard,
     RolesGuard,
-    OwnerGuard
+    OwnerGuard,
   ],
 })
 export class AuthModule {}

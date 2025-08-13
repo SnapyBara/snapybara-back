@@ -1,4 +1,10 @@
-import { Controller, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 
 @Controller('auth')
@@ -33,15 +39,11 @@ export class AuthSimpleController {
         name: payload.name,
         picture: payload.picture,
         googleId: payload.sub,
-        verified: true
+        verified: true,
       };
-
     } catch (error) {
       console.error('Google auth error:', error);
-      throw new HttpException(
-        'Authentication failed',
-        HttpStatus.UNAUTHORIZED
-      );
+      throw new HttpException('Authentication failed', HttpStatus.UNAUTHORIZED);
     }
   }
 }

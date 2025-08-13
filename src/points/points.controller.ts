@@ -152,10 +152,8 @@ export class PointsController {
     description: 'Search results with source information',
   })
   async searchForApp(@Query() searchDto: SearchHybridDto, @Request() req) {
-    // Vérifier si l'utilisateur est premium (à implémenter selon votre logique)
     const isPremium = req.user?.isPremium || false;
 
-    // Si l'utilisateur est premium ET a choisi Google Places
     if (isPremium && searchDto.useGooglePlaces) {
       return this.pointsService.searchHybrid({
         ...searchDto,
@@ -163,7 +161,6 @@ export class PointsController {
       });
     }
 
-    // Sinon, retourner uniquement les données MongoDB
     return this.pointsService.findAll(searchDto);
   }
 
@@ -190,7 +187,6 @@ export class PointsController {
     },
   })
   searchHybrid(@Query() searchDto: SearchPointsDto) {
-    // Par défaut, n'inclure que OpenStreetMap, pas Google Places
     return this.pointsService.searchHybrid({
       ...searchDto,
       includeGooglePlaces: searchDto.includeGooglePlaces ?? false,
@@ -351,7 +347,12 @@ export class PointsController {
     @Request() req,
   ) {
     // TODO: Add admin role check
-    return this.pointsService.updatePointStatus(id, 'rejected', req.user.id, reason);
+    return this.pointsService.updatePointStatus(
+      id,
+      'rejected',
+      req.user.id,
+      reason,
+    );
   }
 
   @Delete('admin/:id')
@@ -494,7 +495,7 @@ export class PointsController {
     console.log('Creating review for point:', id);
     console.log('Review data:', body);
     console.log('User ID:', req.user.id);
-    
+
     const result = await this.reviewsService.create(
       {
         pointId: id,
@@ -503,7 +504,7 @@ export class PointsController {
       },
       req.user.id,
     );
-    
+
     console.log('Review created:', result);
     return result;
   }

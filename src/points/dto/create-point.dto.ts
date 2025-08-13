@@ -194,5 +194,4 @@ export class CreatePointDto {
   requiresPermission?: boolean;
 }
 
-// Alias pour la compatibilité avec l'ancien nom
 export class CreatePointOfInterestDto extends CreatePointDto {}

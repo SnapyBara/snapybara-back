@@ -8,14 +8,16 @@ import { Model, Types } from 'mongoose';
 import { Photo, PhotoDocument } from './schemas/photo.schema';
 import { CreatePhotoDto, UploadPhotoDto } from './dto/create-photo.dto';
 import { UpdatePhotoDto } from './dto/update-photo.dto';
-import { UploadService } from '../upload/upload.service';
+import { HybridUploadService } from '../upload/hybrid-upload.service';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class PhotosService {
   constructor(
     @InjectModel(Photo.name)
     private photoModel: Model<PhotoDocument>,
-    private uploadService: UploadService,
+    private hybridUploadService: HybridUploadService,
+    private usersService: UsersService,
   ) {}
 
   async create(
@@ -205,10 +207,10 @@ export class PhotosService {
     }
 
     return this.photoModel
-      .find({ 
+      .find({
         pointId: new Types.ObjectId(pointId),
         isActive: true,
-        status: 'approved'
+        status: 'approved',
       })
       .sort({ createdAt: -1 })
       .populate('userId', 'username profilePicture')
@@ -221,7 +223,7 @@ export class PhotosService {
     userId: string,
   ): Promise<Photo> {
     // Upload the file
-    const uploadedFile = await this.uploadService.uploadImage(file);
+    const uploadedFile = await this.hybridUploadService.uploadImage(file);
 
     // Create photo document
     const photoData = {
@@ -235,7 +237,9 @@ export class PhotosService {
       mimeType: uploadedFile.mimeType,
       width: uploadedFile.width,
       height: uploadedFile.height,
-      pointId: uploadPhotoDto.pointId ? new Types.ObjectId(uploadPhotoDto.pointId) : undefined,
+      pointId: uploadPhotoDto.pointId
+        ? new Types.ObjectId(uploadPhotoDto.pointId)
+        : undefined,
       caption: uploadPhotoDto.caption,
       tags: uploadPhotoDto.tags || [],
       isPublic: uploadPhotoDto.isPublic !== false,
@@ -248,8 +252,32 @@ export class PhotosService {
       return await createdPhoto.save();
     } catch (error) {
       // If save fails, delete the uploaded files
-      await this.uploadService.deleteImage(uploadedFile.filename);
+      await this.hybridUploadService.deleteImage(uploadedFile.filename);
       throw error;
     }
+  }
+
+  async findBySupabaseUserId(
+    supabaseUserId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: Photo[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    // Trouver l'utilisateur MongoDB à partir du supabaseId
+    const user = await this.usersService.findBySupabaseId(supabaseUserId);
+    if (!user || !user._id) {
+      return { data: [], total: 0, page, limit };
+    }
+
+    // Utiliser l'ID MongoDB pour chercher les photos
+    return this.findAll({
+      userId: user._id.toString(),
+      page,
+      limit,
+    });
   }
 }

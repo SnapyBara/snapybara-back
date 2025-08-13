@@ -12,6 +12,7 @@ import { UploadModule } from '../upload/upload.module';
 import { OverpassModule } from '../overpass/overpass.module';
 import { UsersModule } from '../users/users.module';
 import { ReviewsModule } from '../reviews/reviews.module';
+import { CacheModule } from '../cache/cache.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ReviewsModule } from '../reviews/reviews.module';
     OverpassModule,
     UsersModule,
     ReviewsModule,
+    CacheModule,
   ],
   controllers: [PointsController],
   providers: [PointsService],
