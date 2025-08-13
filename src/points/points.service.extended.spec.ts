@@ -7,6 +7,7 @@ import { UploadService } from '../upload/upload.service';
 import { OverpassService } from '../overpass/overpass.service';
 import { PhotoEnrichmentService } from '../overpass/photo-enrichment.service';
 import { UsersService } from '../users/users.service';
+import { CacheService } from '../cache/cache.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 
@@ -57,6 +58,22 @@ describe('PointsService Extended Tests', () => {
   const mockPhotoEnrichmentService = { enrichPOIsWithPhotos: jest.fn() };
   const mockUsersService = { findBySupabaseId: jest.fn() };
 
+  const mockCacheService = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    DEFAULT_TTL: {
+      SEARCH: 600,
+      DETAILS: 3600,
+      PHOTOS: 604800,
+    },
+    PREFIXES: {
+      POINTS_SEARCH: 'points:search:',
+      POINTS_DETAILS: 'points:details:',
+      GOOGLE_PLACES_PHOTOS: 'google:photos:',
+    },
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -71,6 +88,7 @@ describe('PointsService Extended Tests', () => {
           useValue: mockPhotoEnrichmentService,
         },
         { provide: UsersService, useValue: mockUsersService },
+        { provide: CacheService, useValue: mockCacheService },
       ],
     }).compile();
 

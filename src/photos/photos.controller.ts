@@ -104,7 +104,7 @@ export class PhotosController {
     if (userId && !userId.match(/^[0-9a-fA-F]{24}$/)) {
       return this.photosService.findBySupabaseUserId(userId, page, limit);
     }
-    
+
     return this.photosService.findAll({ pointId, userId, page, limit });
   }
 

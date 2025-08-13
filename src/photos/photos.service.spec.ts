@@ -1,13 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PhotosService } from './photos.service';
-import { UploadService } from '../upload/upload.service';
+import { HybridUploadService } from '../upload/hybrid-upload.service';
+import { UsersService } from '../users/users.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 
 describe('PhotosService', () => {
   let service: PhotosService;
-  let uploadService: UploadService;
+  let hybridUploadService: HybridUploadService;
+  let usersService: UsersService;
   let photoModel: Model<any>;
 
   const createMockPhotoModel = () => {
@@ -26,9 +28,14 @@ describe('PhotosService', () => {
 
   const mockPhotoModel = createMockPhotoModel();
 
-  const mockUploadService = {
+  const mockHybridUploadService = {
     uploadImage: jest.fn(),
     deleteImage: jest.fn(),
+  };
+
+  const mockUsersService = {
+    findBySupabaseId: jest.fn(),
+    findBySupabaseUserId: jest.fn(), // Certains tests pourraient utiliser ce nom
   };
 
   beforeEach(async () => {
@@ -40,14 +47,19 @@ describe('PhotosService', () => {
           useValue: mockPhotoModel,
         },
         {
-          provide: UploadService,
-          useValue: mockUploadService,
+          provide: HybridUploadService,
+          useValue: mockHybridUploadService,
+        },
+        {
+          provide: UsersService,
+          useValue: mockUsersService,
         },
       ],
     }).compile();
 
     service = module.get<PhotosService>(PhotosService);
-    uploadService = module.get<UploadService>(UploadService);
+    hybridUploadService = module.get<HybridUploadService>(HybridUploadService);
+    usersService = module.get<UsersService>(UsersService);
     photoModel = module.get(getModelToken('Photo'));
 
     jest.clearAllMocks();
@@ -122,7 +134,9 @@ describe('PhotosService', () => {
         userId: new Types.ObjectId('507f1f77bcf86cd799439011'),
       };
 
-      mockUploadService.uploadImage.mockResolvedValueOnce(mockUploadedFile);
+      mockHybridUploadService.uploadImage.mockResolvedValueOnce(
+        mockUploadedFile,
+      );
 
       const mockSave = jest.fn().mockResolvedValueOnce(mockSavedPhoto);
       const mockConstructor = jest.fn(() => ({
@@ -137,7 +151,9 @@ describe('PhotosService', () => {
         '507f1f77bcf86cd799439011',
       );
 
-      expect(mockUploadService.uploadImage).toHaveBeenCalledWith(mockFile);
+      expect(mockHybridUploadService.uploadImage).toHaveBeenCalledWith(
+        mockFile,
+      );
       expect(mockConstructor).toHaveBeenCalled();
       expect(mockSave).toHaveBeenCalled();
       expect(result).toEqual(mockSavedPhoto);

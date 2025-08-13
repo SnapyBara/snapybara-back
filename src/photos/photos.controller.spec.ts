@@ -17,6 +17,7 @@ describe('PhotosController', () => {
     toggleLike: jest.fn(),
     getTopPhotos: jest.fn(),
     getRecentPhotos: jest.fn(),
+    findBySupabaseUserId: jest.fn(),
   };
 
   const mockUser = {
@@ -122,15 +123,43 @@ describe('PhotosController', () => {
 
       mockPhotosService.findAll.mockResolvedValue(expectedResult);
 
-      const result = await controller.findAll('point-123', 'user-456', 1, 10);
+      const result = await controller.findAll(
+        '507f1f77bcf86cd799439011',
+        undefined,
+        1,
+        10,
+      );
 
       expect(result).toEqual(expectedResult);
       expect(mockPhotosService.findAll).toHaveBeenCalledWith({
-        pointId: 'point-123',
-        userId: 'user-456',
+        pointId: '507f1f77bcf86cd799439011',
+        userId: undefined,
         page: 1,
         limit: 10,
       });
+    });
+
+    it('should use findBySupabaseUserId for non-ObjectId userId', async () => {
+      const expectedResult = {
+        data: [
+          { _id: '1', url: 'https://example.com/photo1.jpg' },
+          { _id: '2', url: 'https://example.com/photo2.jpg' },
+        ],
+        total: 2,
+        page: 1,
+        limit: 10,
+      };
+
+      mockPhotosService.findBySupabaseUserId.mockResolvedValue(expectedResult);
+
+      const result = await controller.findAll(undefined, 'user-456', 1, 10);
+
+      expect(result).toEqual(expectedResult);
+      expect(mockPhotosService.findBySupabaseUserId).toHaveBeenCalledWith(
+        'user-456',
+        1,
+        10,
+      );
     });
 
     it('should return all photos without filters', async () => {

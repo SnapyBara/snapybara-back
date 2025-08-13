@@ -7,6 +7,7 @@ import { UploadService } from '../upload/upload.service';
 import { OverpassService } from '../overpass/overpass.service';
 import { PhotoEnrichmentService } from '../overpass/photo-enrichment.service';
 import { UsersService } from '../users/users.service';
+import { CacheService } from '../cache/cache.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 
@@ -64,6 +65,21 @@ describe('PointsService', () => {
   const mockOverpassService = { searchPOIs: jest.fn() };
   const mockPhotoEnrichmentService = { enrichPOIsWithPhotos: jest.fn() };
   const mockUsersService = { findBySupabaseId: jest.fn() };
+  const mockCacheService = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    DEFAULT_TTL: {
+      SEARCH: 600,
+      DETAILS: 3600,
+      PHOTOS: 604800,
+    },
+    PREFIXES: {
+      POINTS_SEARCH: 'points:search:',
+      POINTS_DETAILS: 'points:details:',
+      GOOGLE_PLACES_PHOTOS: 'google:photos:',
+    },
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -79,6 +95,7 @@ describe('PointsService', () => {
           useValue: mockPhotoEnrichmentService,
         },
         { provide: UsersService, useValue: mockUsersService },
+        { provide: CacheService, useValue: mockCacheService },
       ],
     }).compile();
 
@@ -358,12 +375,15 @@ describe('PointsService', () => {
   describe('getPointPhotos', () => {
     it('should get photos for a point', async () => {
       const pointId = '507f1f77bcf86cd799439011';
+      const mockPoint = { _id: pointId, name: 'Test Point' };
       const mockPhotos = [
         { id: 'photo-1', url: 'https://example.com/photo1.jpg' },
         { id: 'photo-2', url: 'https://example.com/photo2.jpg' },
       ];
 
+      mockPointModel.findById.mockResolvedValueOnce(mockPoint);
       mockPhotosService.findByPoint.mockResolvedValueOnce(mockPhotos);
+
       const result = await service.getPointPhotos(pointId);
       expect(result).toEqual(mockPhotos);
       expect(mockPhotosService.findByPoint).toHaveBeenCalledWith(pointId);

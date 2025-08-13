@@ -1,13 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PhotosService } from './photos.service';
-import { UploadService } from '../upload/upload.service';
+import { HybridUploadService } from '../upload/hybrid-upload.service';
+import { UsersService } from '../users/users.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 
 describe('PhotosService - Extended Coverage', () => {
   let service: PhotosService;
-  let uploadService: UploadService;
+  let hybridUploadService: HybridUploadService;
+  let usersService: UsersService;
   let photoModel: Model<any>;
 
   const createMockPhotoModel = () => {
@@ -26,9 +28,14 @@ describe('PhotosService - Extended Coverage', () => {
 
   const mockPhotoModel = createMockPhotoModel();
 
-  const mockUploadService = {
+  const mockHybridUploadService = {
     uploadImage: jest.fn(),
     deleteImage: jest.fn(),
+  };
+
+  const mockUsersService = {
+    findBySupabaseId: jest.fn(),
+    findBySupabaseUserId: jest.fn(), // Certains tests pourraient utiliser ce nom
   };
 
   beforeEach(async () => {
@@ -40,14 +47,19 @@ describe('PhotosService - Extended Coverage', () => {
           useValue: mockPhotoModel,
         },
         {
-          provide: UploadService,
-          useValue: mockUploadService,
+          provide: HybridUploadService,
+          useValue: mockHybridUploadService,
+        },
+        {
+          provide: UsersService,
+          useValue: mockUsersService,
         },
       ],
     }).compile();
 
     service = module.get<PhotosService>(PhotosService);
-    uploadService = module.get<UploadService>(UploadService);
+    hybridUploadService = module.get<HybridUploadService>(HybridUploadService);
+    usersService = module.get<UsersService>(UsersService);
     photoModel = module.get(getModelToken('Photo'));
 
     jest.clearAllMocks();
@@ -361,7 +373,9 @@ describe('PhotosService - Extended Coverage', () => {
         height: 1080,
       };
 
-      mockUploadService.uploadImage.mockResolvedValueOnce(mockUploadedFile);
+      mockHybridUploadService.uploadImage.mockResolvedValueOnce(
+        mockUploadedFile,
+      );
 
       const saveError = new Error('Database error');
       const mockSave = jest.fn().mockRejectedValueOnce(saveError);
@@ -375,7 +389,7 @@ describe('PhotosService - Extended Coverage', () => {
         service.uploadPhoto(mockFile, uploadDto, '507f1f77bcf86cd799439011'),
       ).rejects.toThrow(saveError);
 
-      expect(mockUploadService.deleteImage).toHaveBeenCalledWith(
+      expect(mockHybridUploadService.deleteImage).toHaveBeenCalledWith(
         mockUploadedFile.filename,
       );
     });
@@ -414,7 +428,9 @@ describe('PhotosService - Extended Coverage', () => {
         userId: new Types.ObjectId('507f1f77bcf86cd799439011'),
       };
 
-      mockUploadService.uploadImage.mockResolvedValueOnce(mockUploadedFile);
+      mockHybridUploadService.uploadImage.mockResolvedValueOnce(
+        mockUploadedFile,
+      );
 
       const mockSave = jest.fn().mockResolvedValueOnce(mockSavedPhoto);
       const mockConstructor = jest.fn(() => ({
@@ -466,6 +482,64 @@ describe('PhotosService - Extended Coverage', () => {
         status: 'approved',
       });
       expect(mockPhotoModel.sort).toHaveBeenCalledWith({ createdAt: -1 });
+    });
+  });
+
+  describe('findBySupabaseUserId', () => {
+    it('should return empty result when user not found', async () => {
+      mockUsersService.findBySupabaseId.mockResolvedValueOnce(null);
+
+      const result = await service.findBySupabaseUserId('supabase-user-123');
+
+      expect(result).toEqual({ data: [], total: 0, page: 1, limit: 20 });
+      expect(mockUsersService.findBySupabaseId).toHaveBeenCalledWith(
+        'supabase-user-123',
+      );
+    });
+
+    it('should return empty result when user has no _id', async () => {
+      mockUsersService.findBySupabaseId.mockResolvedValueOnce({});
+
+      const result = await service.findBySupabaseUserId('supabase-user-123');
+
+      expect(result).toEqual({ data: [], total: 0, page: 1, limit: 20 });
+    });
+
+    it('should return photos when user found', async () => {
+      const mockUser = {
+        _id: new Types.ObjectId('507f1f77bcf86cd799439011'),
+        supabaseId: 'supabase-user-123',
+      };
+
+      const mockPhotos = [
+        { id: 'photo-1', userId: mockUser._id },
+        { id: 'photo-2', userId: mockUser._id },
+      ];
+
+      mockUsersService.findBySupabaseId.mockResolvedValueOnce(mockUser);
+      mockPhotoModel.exec.mockResolvedValueOnce(mockPhotos);
+      mockPhotoModel.countDocuments.mockResolvedValueOnce(2);
+
+      const result = await service.findBySupabaseUserId(
+        'supabase-user-123',
+        2,
+        10,
+      );
+
+      expect(result).toEqual({
+        data: mockPhotos,
+        total: 2,
+        page: 2,
+        limit: 10,
+      });
+      expect(mockUsersService.findBySupabaseId).toHaveBeenCalledWith(
+        'supabase-user-123',
+      );
+      expect(mockPhotoModel.find).toHaveBeenCalledWith({
+        isActive: true,
+        status: 'approved',
+        userId: new Types.ObjectId(mockUser._id.toString()),
+      });
     });
   });
 });

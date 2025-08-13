@@ -8,7 +8,7 @@ import { Model, Types } from 'mongoose';
 import { Photo, PhotoDocument } from './schemas/photo.schema';
 import { CreatePhotoDto, UploadPhotoDto } from './dto/create-photo.dto';
 import { UpdatePhotoDto } from './dto/update-photo.dto';
-import { UploadService } from '../upload/upload.service';
+import { HybridUploadService } from '../upload/hybrid-upload.service';
 import { UsersService } from '../users/users.service';
 
 @Injectable()
@@ -16,7 +16,7 @@ export class PhotosService {
   constructor(
     @InjectModel(Photo.name)
     private photoModel: Model<PhotoDocument>,
-    private uploadService: UploadService,
+    private hybridUploadService: HybridUploadService,
     private usersService: UsersService,
   ) {}
 
@@ -223,7 +223,7 @@ export class PhotosService {
     userId: string,
   ): Promise<Photo> {
     // Upload the file
-    const uploadedFile = await this.uploadService.uploadImage(file);
+    const uploadedFile = await this.hybridUploadService.uploadImage(file);
 
     // Create photo document
     const photoData = {
@@ -252,7 +252,7 @@ export class PhotosService {
       return await createdPhoto.save();
     } catch (error) {
       // If save fails, delete the uploaded files
-      await this.uploadService.deleteImage(uploadedFile.filename);
+      await this.hybridUploadService.deleteImage(uploadedFile.filename);
       throw error;
     }
   }
