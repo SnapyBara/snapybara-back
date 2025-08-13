@@ -20,17 +20,14 @@ export class CloudinaryUploadService {
       const uploadResult = await this.uploadToCloudinary(file, {
         folder: 'snapybara/original',
         quality: 'auto:best',
-        format: 'auto',
       });
 
-      // Get different size URLs using Cloudinary transformations
       const thumbnailUrl = this.getTransformedUrl(uploadResult.public_id, {
         width: 200,
         height: 200,
         crop: 'fill',
         gravity: 'auto',
         quality: 'auto',
-        fetch_format: 'auto',
       });
 
       const mediumUrl = this.getTransformedUrl(uploadResult.public_id, {
@@ -38,7 +35,6 @@ export class CloudinaryUploadService {
         height: 800,
         crop: 'limit',
         quality: 'auto:good',
-        fetch_format: 'auto',
       });
 
       const largeUrl = this.getTransformedUrl(uploadResult.public_id, {
@@ -46,7 +42,6 @@ export class CloudinaryUploadService {
         height: 1920,
         crop: 'limit',
         quality: 'auto:good',
-        fetch_format: 'auto',
       });
 
       return {
@@ -75,7 +70,7 @@ export class CloudinaryUploadService {
       const uploadStream = this.cloudinary.uploader.upload_stream(
         {
           ...options,
-          resource_type: 'auto',
+          resource_type: 'image',
         },
         (error: UploadApiErrorResponse, result: UploadApiResponse) => {
           if (error) return reject(error);
@@ -88,10 +83,19 @@ export class CloudinaryUploadService {
   }
 
   private getTransformedUrl(publicId: string, transformation: any): string {
-    return this.cloudinary.url(publicId, {
-      secure: true,
-      transformation: [transformation],
-    });
+    const parts: string[] = [];
+
+    if (transformation.width) parts.push(`w_${transformation.width}`);
+    if (transformation.height) parts.push(`h_${transformation.height}`);
+    if (transformation.crop) parts.push(`c_${transformation.crop}`);
+    if (transformation.gravity) parts.push(`g_${transformation.gravity}`);
+    if (transformation.quality) parts.push(`q_${transformation.quality}`);
+
+    parts.push('f_auto');
+
+    const transformationString = parts.join(',');
+
+    return `https://res.cloudinary.com/${this.configService.get('CLOUDINARY_CLOUD_NAME')}/image/upload/${transformationString}/${publicId}`;
   }
 
   async deleteImage(publicId: string): Promise<void> {
@@ -103,7 +107,6 @@ export class CloudinaryUploadService {
     }
   }
 
-  // Méthode utilitaire pour extraire le public_id depuis une URL Cloudinary
   extractPublicId(url: string): string | null {
     const matches = url.match(/\/v\d+\/(.+)\./);
     return matches ? matches[1] : null;
