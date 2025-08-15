@@ -1,93 +1,122 @@
-import { Module, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CacheModule } from '@nestjs/cache-manager';
+import * as redisStore from 'cache-manager-redis-store';
+
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { SupabaseModule } from './supabase/supabase.module';
-import { validateEnvironment } from './config/env.validation';
-import { EmailModule } from './email/email.module';
-import { HealthModule } from './health/health.module';
 import { UsersModule } from './users/users.module';
-import { WebhooksModule } from './webhooks/webhooks.module';
-import { DatabaseConfig } from './config/database.config';
-import { SecurityMiddleware } from './common/middleware/security.middleware';
 import { PointsModule } from './points/points.module';
 import { PhotosModule } from './photos/photos.module';
-import { ReviewsModule } from './reviews/reviews.module';
-import { CollectionsModule } from './collections/collections.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { StatisticsModule } from './statistics/statistics.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 import { SearchModule } from './search/search.module';
-import { UploadModule } from './upload/upload.module';
-import { GraphqlModule } from './graphql/graphql.module';
-import { GooglePlacesModule } from './google-places/google-places.module';
-import { CacheModule } from './cache/cache.module';
 import { OverpassModule } from './overpass/overpass.module';
-import { SentryInterceptor } from './common/interceptors/sentry.interceptor';
+import { GooglePlacesModule } from './google-places/google-places.module';
+import { EmailModule } from './email/email.module';
+import { UploadModule } from './upload/upload.module';
+import { HealthModule } from './health/health.module';
+import { GraphqlModule } from './graphql/graphql.module';
+import { CacheModule as CustomCacheModule } from './cache/cache.module';
+import { SupabaseModule } from './supabase/supabase.module';
+
+import { SecurityLoggingInterceptor } from './common/interceptors/security-logging.interceptor';
+import { SecurityMiddleware } from './common/middleware/security.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate: validateEnvironment,
-      envFilePath: ['.env.local', '.env'],
-    }),
-    ScheduleModule.forRoot(),
-    CacheModule,
-    ThrottlerModule.forRoot([
-      {
-        ttl: parseInt(process.env.THROTTLE_TTL || '60') * 1000, // Convert to milliseconds
-        limit: parseInt(process.env.THROTTLE_LIMIT || '100'),
-      },
-    ]),
-    MongooseModule.forRootAsync({
-      useClass: DatabaseConfig,
+      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
     }),
     SupabaseModule.forRootAsync({
-      useFactory: () => ({
-        supabaseUrl: process.env.SUPABASE_URL!,
-        supabaseKey: process.env.SUPABASE_ANON_KEY!,
-        supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        supabaseOptions: {
-          auth: {
-            persistSession: false,
-          },
-        },
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        supabaseUrl: configService.get<string>('SUPABASE_URL')!,
+        supabaseKey: configService.get<string>('SUPABASE_ANON_KEY')!,
+        supabaseServiceKey: configService.get<string>('SUPABASE_SERVICE_KEY')!,
       }),
     }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        // Désactiver le rate limiting en mode test
+        if (process.env.NODE_ENV === 'test') {
+          return [
+            {
+              ttl: 60000,
+              limit: 1000, // Limite très haute pour les tests
+            },
+          ];
+        }
+        return [
+          {
+            ttl: 60000,
+            limit: 10,
+          },
+        ];
+      },
+    }),
+    MongooseModule.forRootAsync({
+      useFactory: async () => ({
+        uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/snapybara',
+        retryWrites: true,
+        w: 'majority',
+      }),
+    }),
+    CacheModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        // En mode test, utiliser un cache en mémoire au lieu de Redis
+        if (process.env.NODE_ENV === 'test' || process.env.CI === 'true') {
+          return {
+            isGlobal: true,
+            ttl: 60 * 60,
+          };
+        }
+
+        // En production/dev, utiliser Redis
+        return {
+          isGlobal: true,
+          store: redisStore,
+          host: configService.get('REDIS_HOST', 'localhost'),
+          port: parseInt(configService.get('REDIS_PORT', '6379')),
+          ttl: 60 * 60,
+        };
+      },
+    }),
+    ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
-    WebhooksModule,
-    HealthModule,
-    EmailModule,
     PointsModule,
     PhotosModule,
-    ReviewsModule,
-    CollectionsModule,
-    NotificationsModule,
-    StatisticsModule,
+    WebhooksModule,
     SearchModule,
-    UploadModule,
-    GraphqlModule,
-    GooglePlacesModule,
     OverpassModule,
+    GooglePlacesModule,
+    EmailModule,
+    UploadModule,
+    HealthModule,
+    GraphqlModule,
+    CustomCacheModule,
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [
-    DatabaseConfig,
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
+    AppService,
     {
       provide: APP_INTERCEPTOR,
-      useClass: SentryInterceptor,
+      useClass: SecurityLoggingInterceptor,
     },
   ],
 })
-export class AppModule {
+export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(SecurityMiddleware).forRoutes('*');
   }

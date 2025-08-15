@@ -10,6 +10,7 @@ import {
   Length,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class CreatePhotoDto {
   @ApiProperty()
@@ -39,6 +40,11 @@ export class CreatePhotoDto {
   caption?: string;
 
   @ApiPropertyOptional({ default: true })
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   @IsBoolean()
   @IsOptional()
   isPublic?: boolean;
@@ -92,6 +98,11 @@ export class UploadPhotoDto {
   caption?: string;
 
   @ApiPropertyOptional({ default: true })
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   @IsBoolean()
   @IsOptional()
   isPublic?: boolean;

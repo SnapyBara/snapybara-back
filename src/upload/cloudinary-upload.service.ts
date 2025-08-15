@@ -7,6 +7,7 @@ import {
 } from 'cloudinary';
 import * as streamifier from 'streamifier';
 import { UploadedFile } from './upload.service';
+import 'multer';
 
 @Injectable()
 export class CloudinaryUploadService {

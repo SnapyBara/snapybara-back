@@ -10,6 +10,7 @@ import { CreatePhotoDto, UploadPhotoDto } from './dto/create-photo.dto';
 import { UpdatePhotoDto } from './dto/update-photo.dto';
 import { HybridUploadService } from '../upload/hybrid-upload.service';
 import { UsersService } from '../users/users.service';
+import 'multer';
 
 @Injectable()
 export class PhotosService {
@@ -139,7 +140,6 @@ export class PhotosService {
       throw new NotFoundException('Photo not found');
     }
 
-    // Check ownership
     if (photo.userId.toString() !== userId) {
       throw new BadRequestException('You can only delete your own photos');
     }

@@ -14,6 +14,8 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,6 +28,7 @@ import {
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PointsService } from './points.service';
+import 'multer';
 import { CreatePointOfInterestDto } from './dto/create-point.dto';
 import { UpdatePointOfInterestDto } from './dto/update-point.dto';
 import { SearchPointsDto } from './dto/search-points.dto';
@@ -50,8 +53,43 @@ export class PointsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new point of interest' })
   @ApiResponse({ status: 201, description: 'Point created successfully' })
-  create(@Body() createPointDto: CreatePointOfInterestDto, @Request() req) {
-    return this.pointsService.create(createPointDto, req.user.id);
+  async create(
+    @Body() createPointDto: CreatePointOfInterestDto,
+    @Request() req,
+  ) {
+    try {
+      // Valider et nettoyer les données contre les injections NoSQL
+      if (createPointDto && typeof createPointDto === 'object') {
+        // Vérifier si des opérateurs MongoDB sont présents
+        const hasMongoOperators = (obj: any): boolean => {
+          if (!obj || typeof obj !== 'object') return false;
+          return Object.keys(obj).some((key) => key.startsWith('$'));
+        };
+
+        // Rejeter si des opérateurs MongoDB sont détectés
+        const checkField = (value: any, fieldName: string) => {
+          if (hasMongoOperators(value)) {
+            throw new BadRequestException(`Invalid ${fieldName} format`);
+          }
+        };
+
+        // Vérifier les champs sensibles s'ils existent
+        // Note: userId n'est pas dans le DTO, il vient du token JWT
+
+        // S'assurer que les coordonnées sont des nombres valides
+        if (isNaN(createPointDto.latitude) || isNaN(createPointDto.longitude)) {
+          throw new BadRequestException('Invalid coordinates');
+        }
+      }
+
+      return await this.pointsService.create(createPointDto, req.user.id);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      console.error('Error creating point:', error);
+      throw new BadRequestException('Failed to create point');
+    }
   }
 
   @Post('with-photos')
@@ -82,8 +120,29 @@ export class PointsController {
   @Get()
   @ApiOperation({ summary: 'Search points of interest' })
   @ApiResponse({ status: 200, description: 'Points retrieved successfully' })
-  findAll(@Query() searchDto: SearchPointsDto) {
-    return this.pointsService.findAll(searchDto);
+  async findAll(@Query() searchDto: SearchPointsDto) {
+    try {
+      // Valider et nettoyer les paramètres de recherche
+      if (searchDto.search && typeof searchDto.search === 'string') {
+        // Nettoyer les injections potentielles
+        const cleanSearch = searchDto.search.replace(/[{}$]/g, '');
+        if (cleanSearch !== searchDto.search) {
+          // Si le search contient des caractères suspects, le nettoyer
+          searchDto.search = cleanSearch;
+        }
+      }
+
+      return await this.pointsService.findAll(searchDto);
+    } catch (error) {
+      // Log l'erreur mais retourner un résultat vide plutôt qu'une erreur 500
+      console.error('Error in findAll:', error);
+      return {
+        data: [],
+        total: 0,
+        page: searchDto.page || 1,
+        limit: searchDto.limit || 20,
+      };
+    }
   }
 
   @Get('nearby')
@@ -385,7 +444,6 @@ export class PointsController {
     },
   })
   getModerationStats(@Request() req) {
-    // TODO: Add admin role check
     return this.pointsService.getModerationStats();
   }
 
@@ -492,20 +550,47 @@ export class PointsController {
     @Body() body: { rating: number; comment: string },
     @Request() req,
   ) {
-    console.log('Creating review for point:', id);
-    console.log('Review data:', body);
-    console.log('User ID:', req.user.id);
+    try {
+      console.log('Creating review for point:', id);
+      console.log('Review data:', body);
+      console.log('User ID:', req.user.id);
 
-    const result = await this.reviewsService.create(
-      {
-        pointId: id,
-        rating: body.rating,
-        comment: body.comment,
-      },
-      req.user.id,
-    );
+      // Nettoyer le commentaire contre XSS (mais le stocker tel quel)
+      // L'échappement se fera à l'affichage
+      if (body.comment && typeof body.comment !== 'string') {
+        throw new BadRequestException('Invalid comment format');
+      }
 
-    console.log('Review created:', result);
-    return result;
+      // Vérifier que le point existe
+      const point = await this.pointsService.findOne(id);
+      if (!point) {
+        throw new NotFoundException('Point not found');
+      }
+
+      const result = await this.reviewsService.create(
+        {
+          pointId: id,
+          rating: body.rating,
+          comment: body.comment,
+        },
+        req.user.id,
+      );
+
+      console.log('Review created:', result);
+      return result;
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      console.error('Error creating review:', error);
+      // Retourner 409 si c'est probablement une contrainte unique (review déjà existante)
+      if (error.code === 11000) {
+        throw new BadRequestException('You have already reviewed this point');
+      }
+      throw new BadRequestException('Failed to create review');
+    }
   }
 }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UploadService, UploadedFile } from './upload.service';
 import { CloudinaryUploadService } from './cloudinary-upload.service';
+import 'multer';
 
 @Injectable()
 export class HybridUploadService {
