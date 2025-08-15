@@ -13,7 +13,7 @@ FROM base AS dependencies
 COPY package*.json ./
 
 # Install production dependencies only
-RUN npm ci --only=production
+RUN npm ci --only=production --ignore-scripts
 
 # ==========================================
 # STAGE: Build dependencies

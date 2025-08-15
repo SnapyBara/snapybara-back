@@ -22,6 +22,7 @@ import { OverpassService } from '../overpass/overpass.service';
 import { PhotoEnrichmentService } from '../overpass/photo-enrichment.service';
 import { UsersService } from '../users/users.service';
 import { CacheService } from '../cache/cache.service';
+import { Express } from 'express';
 
 @Injectable()
 export class PointsService {
@@ -166,7 +167,7 @@ export class PointsService {
               size: imageBuffer.length,
               fieldname: 'photo',
               encoding: '7bit',
-            } as Express.Multer.File;
+            } as any;
 
             photoData = await this.uploadService.uploadImage(file);
           } else if (photoDto.imageData.startsWith('http')) {
@@ -184,7 +185,7 @@ export class PointsService {
               size: buffer.length,
               fieldname: 'photo',
               encoding: '7bit',
-            } as Express.Multer.File;
+            } as any;
 
             photoData = await this.uploadService.uploadImage(file);
           } else {
@@ -269,6 +270,19 @@ export class PointsService {
   }> {
     const { page = 1, limit = 20, ...filters } = searchDto;
     const skip = (page - 1) * limit;
+
+    // Valider et nettoyer le paramètre de recherche
+    if (filters.search) {
+      // Si c'est un objet JSON stringifié avec des opérateurs MongoDB, le rejeter
+      try {
+        if (filters.search.startsWith('{') || filters.search.includes('$')) {
+          // C'est potentiellement une injection, retourner des résultats vides
+          return { data: [], total: 0, page, limit };
+        }
+      } catch (e) {
+        // Ignorer les erreurs de parsing
+      }
+    }
 
     const categoriesAsStrings = this.categoriesToStrings(filters.categories);
 
@@ -1712,7 +1726,7 @@ export class PointsService {
    */
   async uploadPhotoForPoint(
     pointId: string,
-    file: Express.Multer.File,
+    file: any,
     photoData: { caption?: string; tags?: string[] },
     supabaseUserId: string,
   ): Promise<Photo> {

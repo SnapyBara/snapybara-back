@@ -13,7 +13,6 @@ import {
   UploadedFile,
   ParseFilePipe,
   MaxFileSizeValidator,
-  FileTypeValidator,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -28,6 +27,8 @@ import { PhotosService } from './photos.service';
 import { CreatePhotoDto, UploadPhotoDto } from './dto/create-photo.dto';
 import { UpdatePhotoDto } from './dto/update-photo.dto';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
+import { ImageFileValidator } from '../upload/validators/image-file.validator';
+import 'multer';
 
 @ApiTags('photos')
 @Controller('photos')
@@ -80,7 +81,7 @@ export class PhotosController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
-          new FileTypeValidator({ fileType: /(jpg|jpeg|png|webp)$/ }),
+          new ImageFileValidator(),
         ],
       }),
     )

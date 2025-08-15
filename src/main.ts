@@ -5,9 +5,11 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as path from 'path';
 import * as Sentry from '@sentry/node';
+import helmet from 'helmet';
+import * as session from 'express-session';
+import rateLimit from 'express-rate-limit';
 
 async function bootstrap() {
-  // Initialize Sentry
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV || 'development',
@@ -17,7 +19,66 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Serve static files for uploads
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || 'snapybara-secret-key-2025',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 1000 * 60 * 60 * 24,
+      },
+    }),
+  );
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://fonts.googleapis.com',
+          ],
+          scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+          imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+          connectSrc: [
+            "'self'",
+            'https://api.supabase.co',
+            'https://maps.googleapis.com',
+            'https://overpass-api.de',
+          ],
+        },
+      },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      },
+    }),
+  );
+
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: 'Too many requests from this IP, please try again later',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use(limiter);
+
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: 'Too many authentication attempts',
+    skipSuccessfulRequests: true,
+  });
+  app.use('/auth/login', authLimiter);
+  app.use('/auth/register', authLimiter);
+
   app.useStaticAssets(path.join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/',
   });
@@ -27,19 +88,23 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      disableErrorMessages: process.env.NODE_ENV === 'production',
     }),
   );
 
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3005', // Port de l'admin React
-      'http://localhost:5173', // Vite dev server par défaut
-      'http://localhost:5174', // Port alternatif si 5173 est pris
-      'http://10.37.0.14:3000',
-      'http://10.37.0.15:3000',
-    ],
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? process.env.ALLOWED_ORIGINS?.split(',') || []
+        : [
+            'http://localhost:3000',
+            'http://localhost:3001',
+            'http://localhost:3005',
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'http://10.37.0.14:3000',
+            'http://10.37.0.15:3000',
+          ],
     credentials: true,
   });
 

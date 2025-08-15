@@ -1,0 +1,48 @@
+# Dockerfile optimisé pour Render.com
+FROM node:20-alpine AS base
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create app directory
+WORKDIR /usr/src/app
+
+# Install dependencies
+FROM base AS dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Install dev dependencies for build
+FROM dependencies AS build-dependencies
+RUN npm ci --include=dev
+
+# Build application
+FROM build-dependencies AS build
+COPY . .
+RUN npm run build
+
+# Production image
+FROM base AS production
+
+# Copy production dependencies
+COPY --from=dependencies /usr/src/app/node_modules ./node_modules
+
+# Copy built application
+COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/package*.json ./
+
+# Create upload directory (même si on utilise Cloudinary)
+RUN mkdir -p uploads/original uploads/thumbnail uploads/medium uploads/large
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "dist/main"]
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"

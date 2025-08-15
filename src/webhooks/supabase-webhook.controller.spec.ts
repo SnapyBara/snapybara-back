@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SupabaseWebhookController } from './supabase-webhook.controller';
 import { UsersService } from '../users/users.service';
-import { Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
+import * as crypto from 'crypto';
 
 describe('SupabaseWebhookController', () => {
   let controller: SupabaseWebhookController;
@@ -15,7 +16,15 @@ describe('SupabaseWebhookController', () => {
     syncWithSupabase: jest.fn(),
   };
 
+  const WEBHOOK_SECRET = 'test-webhook-secret';
+  const sign = (payload: any) =>
+    crypto
+      .createHmac('sha256', WEBHOOK_SECRET)
+      .update(JSON.stringify(payload ?? {}))
+      .digest('hex');
+
   beforeEach(async () => {
+    process.env.SUPABASE_WEBHOOK_SECRET = WEBHOOK_SECRET;
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SupabaseWebhookController],
       providers: [
@@ -31,7 +40,6 @@ describe('SupabaseWebhookController', () => {
     );
     usersService = module.get<UsersService>(UsersService);
 
-    // Mock Logger methods
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
     jest.spyOn(Logger.prototype, 'error').mockImplementation();
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
@@ -47,8 +55,6 @@ describe('SupabaseWebhookController', () => {
       username: 'testuser',
     };
 
-    const authHeader = 'Bearer valid-token';
-
     it('should handle user signup (INSERT on users table)', async () => {
       const payload = {
         type: 'INSERT',
@@ -56,19 +62,14 @@ describe('SupabaseWebhookController', () => {
         record: {
           id: 'supabase-123',
           email: 'newuser@example.com',
-          raw_user_meta_data: {
-            full_name: 'New User',
-          },
+          raw_user_meta_data: { full_name: 'New User' },
         },
       };
-
       mockUsersService.syncWithSupabase.mockResolvedValue(mockUser);
-
       const result = await controller.handleSupabaseAuthEvent(
         payload,
-        authHeader,
+        sign(payload),
       );
-
       expect(usersService.syncWithSupabase).toHaveBeenCalledWith(
         payload.record,
       );
@@ -85,19 +86,14 @@ describe('SupabaseWebhookController', () => {
         record: {
           id: 'supabase-123',
           email: 'updated@example.com',
-          raw_user_meta_data: {
-            full_name: 'Updated User',
-          },
+          raw_user_meta_data: { full_name: 'Updated User' },
         },
       };
-
       mockUsersService.syncWithSupabase.mockResolvedValue(mockUser);
-
       const result = await controller.handleSupabaseAuthEvent(
         payload,
-        authHeader,
+        sign(payload),
       );
-
       expect(usersService.syncWithSupabase).toHaveBeenCalledWith(
         payload.record,
       );
@@ -108,19 +104,13 @@ describe('SupabaseWebhookController', () => {
     });
 
     it('should handle unknown event type', async () => {
-      const payload = {
-        type: 'DELETE',
-        table: 'users',
-        record: {},
-      };
-
+      const payload = { type: 'UNKNOWN', table: 'users', record: {} };
       const result = await controller.handleSupabaseAuthEvent(
         payload,
-        authHeader,
+        sign(payload),
       );
-
       expect(Logger.prototype.warn).toHaveBeenCalledWith(
-        'Unhandled webhook type: DELETE',
+        'Unhandled webhook type: UNKNOWN',
       );
       expect(result).toEqual({
         success: true,
@@ -129,52 +119,32 @@ describe('SupabaseWebhookController', () => {
     });
 
     it('should throw unauthorized exception without auth header', async () => {
-      const payload = {
-        type: 'INSERT',
-        table: 'users',
-        record: {},
-      };
-
+      const payload = { type: 'INSERT', table: 'users', record: {} };
       await expect(
         controller.handleSupabaseAuthEvent(payload, undefined),
-      ).rejects.toThrow(
-        new HttpException('Unauthorized webhook', HttpStatus.UNAUTHORIZED),
-      );
+      ).rejects.toThrow('Missing webhook signature');
     });
 
     it('should throw unauthorized exception with invalid auth header', async () => {
-      const payload = {
-        type: 'INSERT',
-        table: 'users',
-        record: {},
-      };
-
+      const payload = { type: 'INSERT', table: 'users', record: {} };
       await expect(
-        controller.handleSupabaseAuthEvent(payload, 'Invalid token'),
-      ).rejects.toThrow(
-        new HttpException('Unauthorized webhook', HttpStatus.UNAUTHORIZED),
-      );
+        controller.handleSupabaseAuthEvent(payload, 'invalid-signature'),
+      ).rejects.toThrow('Invalid webhook signature');
     });
 
     it('should handle errors gracefully', async () => {
       const payload = {
         type: 'INSERT',
         table: 'users',
-        record: {
-          id: 'supabase-123',
-          email: 'error@example.com',
-        },
+        record: { id: 'supabase-123', email: 'error@example.com' },
       };
-
       mockUsersService.syncWithSupabase.mockRejectedValue(
         new Error('Database error'),
       );
-
       const result = await controller.handleSupabaseAuthEvent(
         payload,
-        authHeader,
+        sign(payload),
       );
-
       expect(Logger.prototype.error).toHaveBeenCalled();
       expect(result).toEqual({
         success: true,
@@ -188,12 +158,10 @@ describe('SupabaseWebhookController', () => {
         table: 'profiles',
         record: { id: '123' },
       };
-
       const result = await controller.handleSupabaseAuthEvent(
         payload,
-        authHeader,
+        sign(payload),
       );
-
       expect(usersService.syncWithSupabase).not.toHaveBeenCalled();
       expect(result).toEqual({
         success: true,
