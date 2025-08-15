@@ -11,6 +11,7 @@
 * **api:** new endpoints ([40ec811](https://github.com/SnapyBara/snapybara-back/commit/40ec811748e765ba98b28b31d55f81b65fd1fd90))
 * **api:** new endpoints ([6161ff1](https://github.com/SnapyBara/snapybara-back/commit/6161ff1eb6aae654bef4d474ea3f2911e1c698c5))
 * **api:** new endpoints ([090b3af](https://github.com/SnapyBara/snapybara-back/commit/090b3afa8a37d57d019d388038efd85ec3f1f751))
+* **deploy:** Test release ([fb0f835](https://github.com/SnapyBara/snapybara-back/commit/fb0f835ebb8c0f0a44d0996f2151bcf39fb0fa33))
 * **security:** add security check on guards ([80f9c36](https://github.com/SnapyBara/snapybara-back/commit/80f9c36bf9e6afb50e41286376cfc8a00de1da35))
 
 
