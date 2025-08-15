@@ -42,12 +42,27 @@ import { SecurityMiddleware } from './common/middleware/security.middleware';
         supabaseServiceKey: configService.get<string>('SUPABASE_SERVICE_KEY')!,
       }),
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 10,
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        // Désactiver le rate limiting en mode test
+        if (process.env.NODE_ENV === 'test') {
+          return [
+            {
+              ttl: 60000,
+              limit: 1000, // Limite très haute pour les tests
+            },
+          ];
+        }
+        return [
+          {
+            ttl: 60000,
+            limit: 10,
+          },
+        ];
       },
-    ]),
+    }),
     MongooseModule.forRootAsync({
       useFactory: async () => ({
         uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/snapybara',
@@ -55,12 +70,27 @@ import { SecurityMiddleware } from './common/middleware/security.middleware';
         w: 'majority',
       }),
     }),
-    CacheModule.register({
-      isGlobal: true,
-      store: redisStore,
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      ttl: 60 * 60,
+    CacheModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        // En mode test, utiliser un cache en mémoire au lieu de Redis
+        if (process.env.NODE_ENV === 'test' || process.env.CI === 'true') {
+          return {
+            isGlobal: true,
+            ttl: 60 * 60,
+          };
+        }
+
+        // En production/dev, utiliser Redis
+        return {
+          isGlobal: true,
+          store: redisStore,
+          host: configService.get('REDIS_HOST', 'localhost'),
+          port: parseInt(configService.get('REDIS_PORT', '6379')),
+          ttl: 60 * 60,
+        };
+      },
     }),
     ScheduleModule.forRoot(),
     AuthModule,

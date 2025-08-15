@@ -271,6 +271,19 @@ export class PointsService {
     const { page = 1, limit = 20, ...filters } = searchDto;
     const skip = (page - 1) * limit;
 
+    // Valider et nettoyer le paramètre de recherche
+    if (filters.search) {
+      // Si c'est un objet JSON stringifié avec des opérateurs MongoDB, le rejeter
+      try {
+        if (filters.search.startsWith('{') || filters.search.includes('$')) {
+          // C'est potentiellement une injection, retourner des résultats vides
+          return { data: [], total: 0, page, limit };
+        }
+      } catch (e) {
+        // Ignorer les erreurs de parsing
+      }
+    }
+
     const categoriesAsStrings = this.categoriesToStrings(filters.categories);
 
     if (filters.latitude && filters.longitude && filters.radius) {

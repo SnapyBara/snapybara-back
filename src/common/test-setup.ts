@@ -31,15 +31,17 @@ export function setupTestApp(app: INestApplication): void {
     }),
   );
 
-  // Rate limiting léger pour les tests
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 1000, // Plus élevé pour les tests
-    message: 'Too many requests from this IP, please try again later',
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  nestApp.use(limiter);
+  // Rate limiting désactivé pour les tests en CI
+  if (process.env.CI !== 'true') {
+    const limiter = rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 1000, // Plus élevé pour les tests
+      message: 'Too many requests from this IP, please try again later',
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
+    nestApp.use(limiter);
+  }
 
   // Configuration des fichiers statiques
   nestApp.useStaticAssets(path.join(__dirname, '..', '..', 'uploads'), {

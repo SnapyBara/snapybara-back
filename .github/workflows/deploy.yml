@@ -99,10 +99,10 @@ jobs:
             const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha: sha });
             if (prs.data.length) {
               const ok = process.env.JOB_STATUS === 'success';
-              const emoji = ok ? '✅' : '❌';
+              const emoji = ok ? 'pass' : 'fail';
               const msg = ok
-                ? `${emoji} **Staging** OK pour \`${sha.slice(0,7)}\` → ${process.env.STAGING_URL}`
-                : `${emoji} **Staging** en échec pour \`${sha.slice(0,7)}\` (voir logs Actions)`;
+                ? `${emoji} **Staging** OK for \`${sha.slice(0,7)}\` → ${process.env.STAGING_URL}`
+                : `${emoji} **Staging** fail for \`${sha.slice(0,7)}\` (voir logs Actions)`;
               await github.rest.issues.createComment({ owner, repo, issue_number: prs.data[0].number, body: msg });
             }
 
@@ -156,6 +156,6 @@ jobs:
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: prs.data[0].number,
-                body: `Déployé en **production** : ${process.env.BASE_URL}`
+                body: `Deployed in **production** : ${process.env.BASE_URL}`
               });
             }
