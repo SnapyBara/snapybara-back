@@ -1,0 +1,161 @@
+name: Deploy (Staging & Production)
+
+on:
+  workflow_run:
+    workflows: ["Backend Tests CI"]
+    types: [completed]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-staging:
+    if: >
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'develop'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ secrets.SERVICE_BASE_URL_STAGING }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Notify PR (staging deploy started)
+        uses: actions/github-script@v7
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          STAGING_URL: ${{ secrets.SERVICE_BASE_URL_STAGING }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = process.env.HEAD_SHA || context.sha;
+            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha: sha });
+            if (prs.data.length) {
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: prs.data[0].number,
+                body: `Deployment **staging** starting for \`${sha.slice(0,7)}\` → ${process.env.STAGING_URL}`
+              });
+            }
+
+      - name: Trigger Render deploy (staging)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID_STAGING }}
+        run: |
+          curl -sS -X POST \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys \
+            -d '{"clearCache": false}'
+
+      - name: Smoke test (staging)
+        env:
+          BASE_URL: ${{ secrets.SERVICE_BASE_URL_STAGING }}
+        run: |
+          for i in {1..20}; do
+            echo "Ping $BASE_URL/health (try $i)..."
+            if curl -fsS "$BASE_URL/health" >/dev/null; then
+              echo "OK"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Service not healthy after deploy"; exit 1
+
+      - name: Comment PR about staging deploy (best effort)
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prs = await github.rest.pulls.list({ owner, repo, state: "open", base: "develop" });
+            if (prs.data.length) {
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: prs.data[0].number,
+                body: `Déployé sur **staging** : ${process.env.BASE_URL}`
+              });
+            }
+
+      - name: Notify PR (staging deploy result)
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          STAGING_URL: ${{ secrets.SERVICE_BASE_URL_STAGING }}
+          JOB_STATUS: ${{ job.status }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = process.env.HEAD_SHA || context.sha;
+            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha: sha });
+            if (prs.data.length) {
+              const ok = process.env.JOB_STATUS === 'success';
+              const emoji = ok ? '✅' : '❌';
+              const msg = ok
+                ? `${emoji} **Staging** OK pour \`${sha.slice(0,7)}\` → ${process.env.STAGING_URL}`
+                : `${emoji} **Staging** en échec pour \`${sha.slice(0,7)}\` (voir logs Actions)`;
+              await github.rest.issues.createComment({ owner, repo, issue_number: prs.data[0].number, body: msg });
+            }
+
+  deploy-production:
+    if: >
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+      || (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ secrets.SERVICE_BASE_URL_PROD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger Render deploy (prod)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID_PROD }}
+        run: |
+          curl -sS -X POST \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys \
+            -d '{"clearCache": false}'
+
+      - name: Smoke test (prod)
+        env:
+          BASE_URL: ${{ secrets.SERVICE_BASE_URL_PROD }}
+        run: |
+          for i in {1..30}; do
+            echo "Ping $BASE_URL/health (try $i)..."
+            if curl -fsS "$BASE_URL/health" >/dev/null; then
+              echo "OK"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Service not healthy after deploy"; exit 1
+
+      - name: Comment PR about prod deploy (best effort)
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prs = await github.rest.pulls.list({ owner, repo, state: "closed", base: "main", per_page: 1, sort: "updated", direction: "desc" });
+            if (prs.data.length) {
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: prs.data[0].number,
+                body: `Déployé en **production** : ${process.env.BASE_URL}`
+              });
+            }
