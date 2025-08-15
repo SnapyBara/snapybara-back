@@ -123,8 +123,6 @@ export class UsersService {
     this.logger.log(`User deleted: ${result.username} (${result.email})`);
   }
 
-  // ===== GAMIFICATION =====
-
   async addPoints(id: string, points: number): Promise<UserDocument> {
     const user = await this.findOne(id);
     const newPoints = user.points + points;
@@ -206,8 +204,6 @@ export class UsersService {
   //   return { rank, total };
   // }
 
-  // ===== Manage statement =====
-
   async updateLastLogin(id: string): Promise<UserDocument> {
     return this.update(id, { lastLoginAt: new Date() });
   }
@@ -228,54 +224,117 @@ export class UsersService {
     return user;
   }
 
-  // ===== SUPABASE SYNC =====
-
   async syncWithSupabase(supabaseUser: any): Promise<UserDocument> {
-    const existingUser = await this.findBySupabaseId(supabaseUser.id);
+    const supabaseId: string = supabaseUser?.id;
+    if (!supabaseId) throw new ConflictException('Supabase id manquant');
 
-    if (existingUser) {
-      const updateData: Partial<UpdateUserDto> = {
-        email: supabaseUser.email,
+    const email: string | undefined = supabaseUser?.email;
+    const username: string | undefined = this.extractUsername(supabaseUser);
+    const isEmailVerified: boolean = this.extractIsEmailVerified(supabaseUser);
+    const metadata: Record<string, any> = this.buildMetadata(supabaseUser);
+
+    const profilePicture: string | undefined =
+      supabaseUser?.user_metadata?.avatar_url ||
+      supabaseUser?.raw_user_meta_data?.avatar_url ||
+      supabaseUser?.raw_user_meta_data?.picture;
+
+    const language: string | undefined =
+      supabaseUser?.user_metadata?.language ||
+      supabaseUser?.raw_user_meta_data?.language;
+
+    const update: any = {
+      $setOnInsert: {
+        supabaseId,
+        role: 'user',
+        isActive: true,
+        notificationsEnabled: true,
+        darkModeEnabled: false,
+        privacySettings: 'public',
+        language: language ?? 'fr',
+        level: 1,
+        points: 0,
+        photosUploaded: 0,
+        pointsOfInterestCreated: 0,
+        commentsWritten: 0,
+        likesReceived: 0,
+      },
+      $set: {
+        ...(email ? { email } : {}),
+        ...(username ? { username } : {}),
+        ...(typeof isEmailVerified === 'boolean' ? { isEmailVerified } : {}),
+        ...(profilePicture ? { profilePicture } : {}),
+        ...(language ? { language } : {}), // met à jour si fourni
+        ...(metadata ? { metadata } : {}),
         lastLoginAt: new Date(),
-      };
+        updatedAt: new Date(),
+      },
+    };
 
-      if (supabaseUser.user_metadata?.avatar_url) {
-        updateData.profilePicture = supabaseUser.user_metadata.avatar_url;
-      }
-
-      if (existingUser._id) {
-        const updatedUser = await this.update(
-          existingUser._id.toString(),
-          updateData,
+    try {
+      const doc = await this.userModel.findOneAndUpdate(
+        { supabaseId },
+        update,
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+      this.logger.log(`User synced: ${doc.username}`);
+      return doc;
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        const base =
+          username ||
+          (email
+            ? email
+                .split('@')[0]
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, '')
+            : 'user');
+        const unique = await this.generateUniqueUsername({
+          email,
+          user_metadata: { full_name: base },
+        });
+        const retryUpdate = {
+          ...update,
+          $set: { ...update.$set, username: unique }, // uniquement dans $set
+        };
+        const doc = await this.userModel.findOneAndUpdate(
+          { supabaseId },
+          retryUpdate,
+          { upsert: true, new: true, setDefaultsOnInsert: true },
         );
-        this.logger.log(`User synced: ${updatedUser.username}`);
-        return updatedUser;
-      } else {
-        throw new Error('User ID is undefined');
+        return doc;
       }
-    } else {
-      const username = await this.generateUniqueUsername(supabaseUser);
-
-      const createData: CreateUserDto = {
-        supabaseId: supabaseUser.id,
-        email: supabaseUser.email,
-        username,
-        profilePicture: supabaseUser.user_metadata?.avatar_url,
-        language: supabaseUser.user_metadata?.language || 'fr',
-      };
-
-      const newUser = await this.create(createData);
-
-      if (newUser._id) {
-        await this.giveWelcomeRewards(newUser._id.toString());
-      }
-
-      this.logger.log(`New user created from Supabase: ${newUser.username}`);
-      return newUser;
+      throw error;
     }
   }
 
   // ===== UTILS =====
+
+  private extractUsername(record: any): string | undefined {
+    const meta = record?.raw_user_meta_data || record?.user_metadata || {};
+    const candidate: string | undefined =
+      meta.username ||
+      meta.full_name ||
+      meta.name ||
+      (typeof record?.email === 'string'
+        ? record.email.split('@')[0]
+        : undefined);
+
+    if (!candidate || typeof candidate !== 'string') return undefined;
+    return candidate.trim().replace(/\s+/g, '').toLowerCase();
+  }
+
+  private extractIsEmailVerified(record: any): boolean {
+    if (record?.email_confirmed_at) return true;
+    const meta = record?.raw_user_meta_data || record?.user_metadata || {};
+    if (typeof meta.email_verified === 'boolean') return meta.email_verified;
+    return false;
+  }
+
+  private buildMetadata(record: any): Record<string, any> {
+    const rawUser = record?.raw_user_meta_data || record?.user_metadata || {};
+    const rawApp = record?.raw_app_meta_data || record?.app_metadata || {};
+    return { ...rawUser, ...rawApp };
+  }
 
   private calculateLevel(points: number): number {
     // Niveau 1: 0-99 points, Niveau 2: 100-299, Niveau 3: 300-599, etc.

@@ -97,7 +97,6 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     name: Deploy to Render
-    # Only deploy when PR is merged (push to main)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
@@ -120,10 +119,9 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const status = '${{ job.status }}' === 'success' ? '✅ Deployment triggered' : '❌ Failed to trigger deployment';
+          const status = '${{ job.status }}' === 'success' ? 'Deployment triggered' : 'Failed to trigger deployment';
           const message = `### Render Deployment Status\n\n${status}`;
           
-          // Comment on the PR if this was triggered by a PR merge
           const prNumber = context.payload.pull_request?.number;
           if (prNumber) {
             await github.rest.issues.createComment({

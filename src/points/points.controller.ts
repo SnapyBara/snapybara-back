@@ -26,6 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PointsService } from './points.service';
+import 'multer';
 import { CreatePointOfInterestDto } from './dto/create-point.dto';
 import { UpdatePointOfInterestDto } from './dto/update-point.dto';
 import { SearchPointsDto } from './dto/search-points.dto';
@@ -385,7 +386,6 @@ export class PointsController {
     },
   })
   getModerationStats(@Request() req) {
-    // TODO: Add admin role check
     return this.pointsService.getModerationStats();
   }
 

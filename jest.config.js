@@ -5,6 +5,8 @@ module.exports = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
+  setupFiles: ['<rootDir>/../test/setup-env.ts'],
+  setupFilesAfterEnv: ['<rootDir>/../test/setup-tests.ts'],
   collectCoverageFrom: [
     '**/*.(t|j)s',
     '!**/*.module.ts',

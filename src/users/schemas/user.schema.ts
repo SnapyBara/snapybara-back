@@ -10,9 +10,8 @@ export type UserDocument = User & Document;
 export class User {
   _id?: Types.ObjectId;
 
-  // ===== IDENTIFIANTS ET CONNEXION SUPABASE =====
   @Prop({ required: true, unique: true })
-  supabaseId: string; // Lien avec Supabase
+  supabaseId: string;
 
   @Prop({ required: true, unique: true })
   email: string;
@@ -20,25 +19,21 @@ export class User {
   @Prop({ required: true })
   username: string;
 
-  // ===== PROFIL UTILISATEUR =====
   @Prop({ required: false })
   profilePicture?: string;
 
   @Prop({ default: Date.now })
   dateJoined: Date;
 
-  // ===== GAMIFICATION (selon ton schéma) =====
   @Prop({ default: 1 })
-  level: number; // Niveau utilisateur
+  level: number;
 
   @Prop({ default: 0 })
-  points: number; // Points accumulés
+  points: number;
 
-  // ===== BADGES ET ACHIEVEMENTS =====
   @Prop({ type: [String], default: [] })
-  achievements: string[]; // IDs des achievements obtenus
+  achievements: string[];
 
-  // ===== PRÉFÉRENCES UTILISATEUR =====
   @Prop({ default: true })
   notificationsEnabled: boolean;
 
@@ -51,7 +46,6 @@ export class User {
   @Prop({ default: 'fr' })
   language: string;
 
-  // ===== STATUTS ET MÉTADONNÉES =====
   @Prop({ default: 'user', enum: ['user', 'admin', 'moderator'] })
   role: string;
 
@@ -70,28 +64,25 @@ export class User {
   @Prop({ default: Date.now })
   updatedAt: Date;
 
-  // ===== STATISTIQUES (pour le profil) =====
   @Prop({ default: 0 })
-  photosUploaded: number; // Nombre de photos uploadées
+  photosUploaded: number;
 
   @Prop({ default: 0 })
-  pointsOfInterestCreated: number; // POI créés
+  pointsOfInterestCreated: number;
 
   @Prop({ default: 0 })
-  commentsWritten: number; // Commentaires écrits
+  commentsWritten: number;
 
   @Prop({ default: 0 })
-  likesReceived: number; // Likes reçus sur ses photos
+  likesReceived: number;
 
-  // ===== MÉTADONNÉES SUPPLÉMENTAIRES =====
   @Prop({ type: Object, default: {} })
   metadata: Record<string, any>;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Index pour optimiser les requêtes
 UserSchema.index({ username: 1 });
-UserSchema.index({ points: -1 }); // Pour les classements
+UserSchema.index({ points: -1 });
 UserSchema.index({ level: -1 });
 UserSchema.index({ createdAt: -1 });

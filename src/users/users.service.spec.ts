@@ -36,7 +36,7 @@ describe('UsersService', () => {
             findById: jest.fn(),
             findByIdAndUpdate: jest.fn(),
             findByIdAndDelete: jest.fn(),
-            exec: jest.fn(),
+            findOneAndUpdate: jest.fn(),
           },
         },
       ],
@@ -49,7 +49,6 @@ describe('UsersService', () => {
   describe('create', () => {
     it('should create a user', async () => {
       const saveMock = jest.fn().mockResolvedValue(mockUser);
-
       service['userModel'] = Object.assign(jest.fn(), {
         findOne: jest.fn().mockResolvedValue(null),
         prototype: { save: saveMock },
@@ -169,37 +168,34 @@ describe('UsersService', () => {
     });
   });
 
-  describe('syncWithSupabase', () => {
-    it('should update existing user', async () => {
-      jest
-        .spyOn(service, 'findBySupabaseId')
-        .mockResolvedValue(mockUser as any);
-      jest.spyOn(service, 'update').mockResolvedValue(mockUser as any);
+  describe('syncWithSupabase (upsert)', () => {
+    it('should upsert-update existing user', async () => {
+      const updated = { ...mockUser, email: 't@t.com' };
+      model.findOneAndUpdate.mockResolvedValue(updated);
       const result = await service.syncWithSupabase({
         id: 'supabase123',
         email: 't@t.com',
         user_metadata: {},
       });
-      expect(result).toEqual(mockUser);
+      expect(model.findOneAndUpdate).toHaveBeenCalled();
+      expect(result).toEqual(updated as any);
     });
 
-    it('should create new user if not exists', async () => {
-      jest.spyOn(service, 'findBySupabaseId').mockResolvedValue(null);
-      jest
-        .spyOn<any, any>(service, 'generateUniqueUsername')
-        .mockResolvedValue('uniqueName');
-      jest
-        .spyOn(service, 'create')
-        .mockResolvedValue({ ...mockUser, _id: '123' } as any);
-      jest
-        .spyOn<any, any>(service, 'giveWelcomeRewards')
-        .mockResolvedValue(undefined);
+    it('should upsert-create new user', async () => {
+      const created = {
+        ...mockUser,
+        _id: '456',
+        supabaseId: 'new',
+        username: 'unique',
+      };
+      model.findOneAndUpdate.mockResolvedValue(created);
       const result = await service.syncWithSupabase({
-        id: 'supabase123',
-        email: 't@t.com',
+        id: 'new',
+        email: 'new@t.com',
         user_metadata: {},
       });
-      expect(result.username).toBeDefined();
+      expect(model.findOneAndUpdate).toHaveBeenCalled();
+      expect(result).toEqual(created as any);
     });
   });
 });

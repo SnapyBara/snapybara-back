@@ -22,6 +22,7 @@ import { OverpassService } from '../overpass/overpass.service';
 import { PhotoEnrichmentService } from '../overpass/photo-enrichment.service';
 import { UsersService } from '../users/users.service';
 import { CacheService } from '../cache/cache.service';
+import { Express } from 'express';
 
 @Injectable()
 export class PointsService {
@@ -166,7 +167,7 @@ export class PointsService {
               size: imageBuffer.length,
               fieldname: 'photo',
               encoding: '7bit',
-            } as Express.Multer.File;
+            } as any;
 
             photoData = await this.uploadService.uploadImage(file);
           } else if (photoDto.imageData.startsWith('http')) {
@@ -184,7 +185,7 @@ export class PointsService {
               size: buffer.length,
               fieldname: 'photo',
               encoding: '7bit',
-            } as Express.Multer.File;
+            } as any;
 
             photoData = await this.uploadService.uploadImage(file);
           } else {
@@ -1712,7 +1713,7 @@ export class PointsService {
    */
   async uploadPhotoForPoint(
     pointId: string,
-    file: Express.Multer.File,
+    file: any,
     photoData: { caption?: string; tags?: string[] },
     supabaseUserId: string,
   ): Promise<Photo> {
