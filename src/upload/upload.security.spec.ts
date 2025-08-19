@@ -191,9 +191,6 @@ describe('Upload Security Tests', () => {
             contentType: 'image/jpeg',
           })
           .field('pointId', '507f1f77bcf86cd799439011');
-
-        // Multer sanitizes the filenames, so they become valid
-        // The important thing is that the malicious path is not executed
         expect([200, 201, 400, 422]).toContain(response.status);
       }
     });
@@ -208,9 +205,6 @@ describe('Upload Security Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .attach('photo', fakeJpeg, 'fake.jpg')
         .field('pointId', '507f1f77bcf86cd799439011');
-
-      // Avec les validateurs actuels, cela pourrait passer si on ne vérifie que l'extension
-      // L'implémentation actuelle ne vérifie pas le contenu du fichier
       expect([200, 201, 400]).toContain(response.status);
     });
 
@@ -228,7 +222,6 @@ describe('Upload Security Tests', () => {
         .attach('photo', svgWithScript, 'malicious.svg')
         .field('pointId', '507f1f77bcf86cd799439011');
 
-      // .svg n'est pas dans les extensions autorisées (jpg|jpeg|png|webp)
       expect(response.status).toBe(400);
     });
   });
