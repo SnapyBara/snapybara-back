@@ -305,7 +305,6 @@ export class UsersController {
     @Body() updateRoleDto: UpdateRoleDto,
     @CurrentUser() currentUser: any,
   ) {
-    // Prevent admin from changing their own role
     if (id === currentUser.mongoId) {
       throw new HttpException(
         'You cannot change your own role',

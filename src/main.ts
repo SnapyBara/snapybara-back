@@ -115,7 +115,7 @@ async function bootstrap() {
       
       API pour l'application SnapyBara - Découverte photo et géolocalisation.
       
-      ### 🔐 Authentification
+      ### Authentification
       
       L'API utilise **Supabase JWT** pour l'authentification. Les endpoints protégés nécessitent un token Bearer.
       
@@ -124,7 +124,7 @@ async function bootstrap() {
       2. Supabase retourne un JWT token
       3. L'app utilise ce token pour appeler les endpoints protégés
       
-      ### 🚀 Utilisation
+      ###Utilisation
       
       1. Obtenez un token JWT depuis Supabase
       2. Cliquez sur "Authorize" ci-dessous

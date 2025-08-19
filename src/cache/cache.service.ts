@@ -79,7 +79,7 @@ export class CacheService {
   }
 
   /**
-   * Vider tout le cache (à utiliser avec précaution)
+   * Clean all the cache
    */
   async reset(): Promise<void> {
     try {
@@ -100,7 +100,6 @@ export class CacheService {
     keyword?: string;
   }): string {
     const { latitude, longitude, radius, type, keyword } = params;
-    // Arrondir les coordonnées pour grouper les recherches proches
     const lat = Math.round(latitude * 1000) / 1000;
     const lng = Math.round(longitude * 1000) / 1000;
 
@@ -250,7 +249,6 @@ export class CacheService {
     radius: number,
     marginKm: number = 0.5,
   ): Promise<string | null> {
-    // Vérifier les clés proches (avec une marge)
     const nearbyKeys: string[] = [];
     const steps = [-1, 0, 1];
 
@@ -313,8 +311,6 @@ export class CacheService {
    */
   async cleanup(): Promise<void> {
     this.logger.log('Cache cleanup requested');
-    // Implementation depends on cache provider
-    // For Redis, this would be handled automatically with TTL
   }
 
   /**

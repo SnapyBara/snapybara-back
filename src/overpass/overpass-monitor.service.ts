@@ -29,7 +29,7 @@ export class OverpassMonitorService {
   };
 
   /**
-   * Enregistrer le début d'une requête
+   * Register request
    */
   recordQueryStart(serverUrl: string): number {
     if (!this.serverMetrics[serverUrl]) {
@@ -140,18 +140,15 @@ export class OverpassMonitorService {
     for (const server of servers) {
       const metrics = this.serverMetrics[server];
       if (!metrics || metrics.total === 0) {
-        // Nouveau serveur ou pas de données - lui donner une chance
         return server;
       }
 
-      // Calculer un score basé sur le taux de succès et le temps de réponse
       const successRate = metrics.success / metrics.total;
       const avgTime = metrics.avgResponseTime || 1000;
       const recentError =
         metrics.lastErrorTime &&
-        Date.now() - metrics.lastErrorTime.getTime() < 300000; // 5 minutes
+        Date.now() - metrics.lastErrorTime.getTime() < 300000;
 
-      // Score = taux de succès * 1000 - temps moyen - pénalité pour erreur récente
       const score = successRate * 1000 - avgTime / 10 - (recentError ? 200 : 0);
 
       if (score > bestScore) {
