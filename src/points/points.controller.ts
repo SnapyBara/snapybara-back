@@ -58,25 +58,17 @@ export class PointsController {
     @Request() req,
   ) {
     try {
-      // Valider et nettoyer les données contre les injections NoSQL
       if (createPointDto && typeof createPointDto === 'object') {
-        // Vérifier si des opérateurs MongoDB sont présents
         const hasMongoOperators = (obj: any): boolean => {
           if (!obj || typeof obj !== 'object') return false;
           return Object.keys(obj).some((key) => key.startsWith('$'));
         };
 
-        // Rejeter si des opérateurs MongoDB sont détectés
         const checkField = (value: any, fieldName: string) => {
           if (hasMongoOperators(value)) {
             throw new BadRequestException(`Invalid ${fieldName} format`);
           }
         };
-
-        // Vérifier les champs sensibles s'ils existent
-        // Note: userId n'est pas dans le DTO, il vient du token JWT
-
-        // S'assurer que les coordonnées sont des nombres valides
         if (isNaN(createPointDto.latitude) || isNaN(createPointDto.longitude)) {
           throw new BadRequestException('Invalid coordinates');
         }

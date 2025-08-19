@@ -37,7 +37,6 @@ export class AuthService {
         throw new UnauthorizedException('Invalid authentication token');
       }
 
-      // Get or sync user from MongoDB
       let mongoUser = await this.usersService.findBySupabaseId(user.id);
 
       if (!mongoUser) {

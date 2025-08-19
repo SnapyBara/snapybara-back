@@ -16,17 +16,14 @@ export class OwnerGuard implements CanActivate {
       throw new ForbiddenException('You can only access your own resources');
     }
 
-    // Admin can access everything
     if (user.role === 'admin') {
       return true;
     }
 
-    // Check if params exist
     if (!params) {
       throw new ForbiddenException('You can only access your own resources');
     }
 
-    // Check if user is accessing their own data
     const resourceId = params.id || params.userId || params.supabaseId;
 
     if (
