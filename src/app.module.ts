@@ -23,6 +23,7 @@ import { HealthModule } from './health/health.module';
 import { GraphqlModule } from './graphql/graphql.module';
 import { CacheModule as CustomCacheModule } from './cache/cache.module';
 import { SupabaseModule } from './supabase/supabase.module';
+import { DebugModule } from './debug/debug.module';
 
 import { SecurityLoggingInterceptor } from './common/interceptors/security-logging.interceptor';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
@@ -64,11 +65,18 @@ import { SecurityMiddleware } from './common/middleware/security.middleware';
       },
     }),
     MongooseModule.forRootAsync({
-      useFactory: async () => ({
-        uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/snapybara',
-        retryWrites: true,
-        w: 'majority',
-      }),
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        const uri =
+          configService.get<string>('MONGODB_URI') ||
+          'mongodb://localhost:27017/snapybara';
+        return {
+          uri,
+          retryWrites: true,
+          w: 'majority',
+        };
+      },
     }),
     CacheModule.registerAsync({
       imports: [ConfigModule],
@@ -106,6 +114,7 @@ import { SecurityMiddleware } from './common/middleware/security.middleware';
     HealthModule,
     GraphqlModule,
     CustomCacheModule,
+    DebugModule,
   ],
   controllers: [AppController],
   providers: [

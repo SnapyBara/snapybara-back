@@ -31,6 +31,7 @@
     "script:test-search": "ts-node -r tsconfig-paths/register src/scripts/test-search.ts",
     "script:clear-queue": "ts-node -r tsconfig-paths/register src/scripts/clear-overpass-queue.ts",
     "script:migrate-cloudinary": "ts-node -r tsconfig-paths/register src/scripts/migrate-to-cloudinary.ts",
+    "debug:mongo": "ts-node -r tsconfig-paths/register src/debug-mongo.ts",
     "prepare": "husky"
   },
   "dependencies": {

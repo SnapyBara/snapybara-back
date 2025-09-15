@@ -7,6 +7,7 @@ import {
   HttpException,
   HttpStatus,
   HttpCode,
+  Get,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { UsersService } from '../users/users.service';
@@ -19,6 +20,21 @@ export class SupabaseWebhookController {
   private readonly logger = new Logger(SupabaseWebhookController.name);
 
   constructor(private usersService: UsersService) {}
+
+  @Get('supabase/test')
+  @Public()
+  @ApiOperation({ summary: 'Test webhook endpoint' })
+  async testWebhook() {
+    return {
+      status: 'ok',
+      message: 'Webhook endpoint is working',
+      timestamp: new Date().toISOString(),
+      configuration: {
+        secretConfigured: !!process.env.SUPABASE_WEBHOOK_SECRET,
+        environment: process.env.NODE_ENV || 'development',
+      },
+    };
+  }
 
   @Post('supabase')
   @Public()
@@ -33,23 +49,50 @@ export class SupabaseWebhookController {
         `Processing webhook: ${payload?.type} on table ${payload?.table}`,
       );
 
-      if (!signature) {
-        throw new HttpException(
-          'Missing webhook signature',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
+      // Vérification de signature optionnelle en développement
+      const webhookSecret = process.env.SUPABASE_WEBHOOK_SECRET;
+      const isDevelopment = process.env.NODE_ENV !== 'production';
 
-      const expectedSignature = crypto
-        .createHmac('sha256', process.env.SUPABASE_WEBHOOK_SECRET || '')
-        .update(JSON.stringify(payload ?? {}))
-        .digest('hex');
+      if (webhookSecret) {
+        // Si un secret est configuré, on vérifie la signature
+        if (!signature) {
+          this.logger.warn(
+            'Missing webhook signature but secret is configured',
+          );
+          if (!isDevelopment) {
+            throw new HttpException(
+              'Missing webhook signature',
+              HttpStatus.UNAUTHORIZED,
+            );
+          }
+        } else {
+          const expectedSignature = crypto
+            .createHmac('sha256', webhookSecret)
+            .update(JSON.stringify(payload ?? {}))
+            .digest('hex');
 
-      if (signature !== expectedSignature) {
-        throw new HttpException(
-          'Invalid webhook signature',
-          HttpStatus.UNAUTHORIZED,
+          if (signature !== expectedSignature) {
+            this.logger.warn('Invalid webhook signature');
+            if (!isDevelopment) {
+              throw new HttpException(
+                'Invalid webhook signature',
+                HttpStatus.UNAUTHORIZED,
+              );
+            }
+          } else {
+            this.logger.log('Webhook signature verified successfully');
+          }
+        }
+      } else {
+        // Pas de secret configuré
+        this.logger.warn(
+          'SUPABASE_WEBHOOK_SECRET not configured - signature verification skipped',
         );
+        if (!isDevelopment && signature) {
+          this.logger.error(
+            'Webhook signature provided but no secret configured to verify it',
+          );
+        }
       }
 
       switch (payload?.type) {

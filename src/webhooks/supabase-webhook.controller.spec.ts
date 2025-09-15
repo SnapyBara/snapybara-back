@@ -25,6 +25,7 @@ describe('SupabaseWebhookController', () => {
 
   beforeEach(async () => {
     process.env.SUPABASE_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.NODE_ENV = 'test'; // Définir l'environnement comme test (pas production)
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SupabaseWebhookController],
       providers: [
@@ -118,14 +119,46 @@ describe('SupabaseWebhookController', () => {
       });
     });
 
-    it('should throw unauthorized exception without auth header', async () => {
+    it('should not throw but log warning without auth header in development', async () => {
+      const payload = { type: 'INSERT', table: 'users', record: {} };
+      const result = await controller.handleSupabaseAuthEvent(
+        payload,
+        undefined,
+      );
+      expect(Logger.prototype.warn).toHaveBeenCalledWith(
+        'Missing webhook signature but secret is configured',
+      );
+      expect(result).toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
+      });
+    });
+
+    it('should not throw but log warning with invalid auth header in development', async () => {
+      const payload = { type: 'INSERT', table: 'users', record: {} };
+      const result = await controller.handleSupabaseAuthEvent(
+        payload,
+        'invalid-signature',
+      );
+      expect(Logger.prototype.warn).toHaveBeenCalledWith(
+        'Invalid webhook signature',
+      );
+      expect(result).toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
+      });
+    });
+
+    it('should throw unauthorized exception without auth header in production', async () => {
+      process.env.NODE_ENV = 'production';
       const payload = { type: 'INSERT', table: 'users', record: {} };
       await expect(
         controller.handleSupabaseAuthEvent(payload, undefined),
       ).rejects.toThrow('Missing webhook signature');
     });
 
-    it('should throw unauthorized exception with invalid auth header', async () => {
+    it('should throw unauthorized exception with invalid auth header in production', async () => {
+      process.env.NODE_ENV = 'production';
       const payload = { type: 'INSERT', table: 'users', record: {} };
       await expect(
         controller.handleSupabaseAuthEvent(payload, 'invalid-signature'),
