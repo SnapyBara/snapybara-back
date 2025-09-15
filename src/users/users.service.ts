@@ -18,30 +18,49 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
     try {
+      // Check for existing user, but only check username if it's provided
+      const orConditions: any[] = [
+        { email: createUserDto.email },
+        { supabaseId: createUserDto.supabaseId },
+      ];
+
+      // Only check username if it's provided
+      if (createUserDto.username) {
+        orConditions.push({ username: createUserDto.username });
+      }
+
       const existingUser = await this.userModel.findOne({
-        $or: [
-          { email: createUserDto.email },
-          { username: createUserDto.username },
-          { supabaseId: createUserDto.supabaseId },
-        ],
+        $or: orConditions,
       });
 
       if (existingUser) {
-        throw new ConflictException(
-          'Utilisateur déjà existant (email, username ou supabaseId)',
-        );
+        if (existingUser.email === createUserDto.email) {
+          throw new ConflictException('Email already exists');
+        }
+        if (existingUser.supabaseId === createUserDto.supabaseId) {
+          throw new ConflictException('Supabase ID already exists');
+        }
+        if (
+          createUserDto.username &&
+          existingUser.username === createUserDto.username
+        ) {
+          throw new ConflictException('Username already exists');
+        }
+        throw new ConflictException('User already exists');
       }
 
       const createdUser = new this.userModel(createUserDto);
       const savedUser = await createdUser.save();
 
       this.logger.log(
-        `User created: ${savedUser.username} (${savedUser.email})`,
+        `User created: ${savedUser.username || 'NO USERNAME'} (${savedUser.email})`,
       );
       return savedUser;
     } catch (error) {
       if (error.code === 11000) {
-        throw new ConflictException('Utilisateur déjà existant');
+        // Handle duplicate key error
+        const field = Object.keys(error.keyPattern)[0];
+        throw new ConflictException(`${field} already exists`);
       }
       throw error;
     }
@@ -242,6 +261,11 @@ export class UsersService {
       supabaseUser?.user_metadata?.language ||
       supabaseUser?.raw_user_meta_data?.language;
 
+    // Log extracted username for debugging
+    this.logger.log(
+      `Extracted username for ${email}: ${username ? `'${username}'` : 'undefined/null'}`,
+    );
+
     const update: any = {
       $setOnInsert: {
         supabaseId,
@@ -257,13 +281,16 @@ export class UsersService {
         pointsOfInterestCreated: 0,
         commentsWritten: 0,
         likesReceived: 0,
+        // Don't set username on insert if not provided
+        ...(username ? { username } : {}),
       },
       $set: {
         ...(email ? { email } : {}),
+        // Only update username if explicitly provided
         ...(username ? { username } : {}),
         ...(typeof isEmailVerified === 'boolean' ? { isEmailVerified } : {}),
         ...(profilePicture ? { profilePicture } : {}),
-        ...(language ? { language } : {}), // met à jour si fourni
+        ...(language ? { language } : {}),
         ...(metadata ? { metadata } : {}),
         lastLoginAt: new Date(),
         updatedAt: new Date(),
@@ -276,33 +303,28 @@ export class UsersService {
         update,
         { upsert: true, new: true, setDefaultsOnInsert: true },
       );
-      this.logger.log(`User synced: ${doc.username}`);
+
+      // Log the actual username value in the document
+      const actualUsername = doc.username;
+      this.logger.log(
+        `User synced: ${doc.email} (username in DB: ${
+          actualUsername === undefined
+            ? 'undefined'
+            : actualUsername === null
+              ? 'null'
+              : actualUsername === ''
+                ? 'empty string'
+                : `'${actualUsername}'`
+        })`,
+      );
+
       return doc;
     } catch (error: any) {
-      if (error?.code === 11000) {
-        const base =
-          username ||
-          (email
-            ? email
-                .split('@')[0]
-                .toLowerCase()
-                .replace(/[^a-z0-9]/g, '')
-            : 'user');
-        const unique = await this.generateUniqueUsername({
-          email,
-          user_metadata: { full_name: base },
-        });
-        const retryUpdate = {
-          ...update,
-          $set: { ...update.$set, username: unique }, // uniquement dans $set
-        };
-        const doc = await this.userModel.findOneAndUpdate(
-          { supabaseId },
-          retryUpdate,
-          { upsert: true, new: true, setDefaultsOnInsert: true },
-        );
-        return doc;
+      // If there's a duplicate key error and it's NOT about username, throw it
+      if (error?.code === 11000 && !error.message?.includes('username')) {
+        throw error;
       }
+      // For username conflicts or other errors, just throw
       throw error;
     }
   }
@@ -311,13 +333,10 @@ export class UsersService {
 
   private extractUsername(record: any): string | undefined {
     const meta = record?.raw_user_meta_data || record?.user_metadata || {};
-    const candidate: string | undefined =
-      meta.username ||
-      meta.full_name ||
-      meta.name ||
-      (typeof record?.email === 'string'
-        ? record.email.split('@')[0]
-        : undefined);
+
+    // Only use username if explicitly provided in metadata
+    // Don't auto-generate from email or name
+    const candidate: string | undefined = meta.username;
 
     if (!candidate || typeof candidate !== 'string') return undefined;
     return candidate.trim().replace(/\s+/g, '').toLowerCase();

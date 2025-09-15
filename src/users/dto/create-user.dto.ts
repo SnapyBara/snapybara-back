@@ -10,9 +10,10 @@ export class CreateUserDto {
   @IsString()
   supabaseId: string;
 
-  @ApiProperty({ description: "Nom d'utilisateur unique" })
+  @ApiProperty({ description: "Nom d'utilisateur unique", required: false })
+  @IsOptional()
   @IsString()
-  username: string;
+  username?: string;
 
   @ApiProperty({ description: 'URL de la photo de profil', required: false })
   @IsOptional()

@@ -41,6 +41,24 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  /**
+   * Helper method to format user response
+   */
+  private formatUserResponse(user: any): UserResponseDto {
+    const userObject = user.toObject();
+    // Ensure _id is a string
+    userObject._id = userObject._id.toString();
+
+    // Ensure username is explicitly null if not set
+    if (!userObject.username || userObject.username === '') {
+      userObject.username = null;
+    }
+
+    return plainToClass(UserResponseDto, userObject, {
+      excludeExtraneousValues: true,
+    });
+  }
+
   @Post()
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
@@ -52,9 +70,7 @@ export class UsersController {
   })
   async create(@Body() createUserDto: CreateUserDto) {
     const user = await this.usersService.create(createUserDto);
-    return plainToClass(UserResponseDto, user.toObject(), {
-      excludeExtraneousValues: true,
-    });
+    return this.formatUserResponse(user);
   }
 
   @Get()
@@ -62,11 +78,42 @@ export class UsersController {
   @ApiOperation({ summary: 'Get list of users (admin only)' })
   async findAll(@Query('limit') limit = 50, @Query('skip') skip = 0) {
     const users = await this.usersService.findAll(+limit, +skip);
-    return users.map((user) =>
-      plainToClass(UserResponseDto, user.toObject(), {
-        excludeExtraneousValues: true,
-      }),
-    );
+    return users.map((user) => this.formatUserResponse(user));
+  }
+
+  @Get('check-username/:username')
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 requests per minute
+  @ApiOperation({ summary: 'Check if username is available (public)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Username availability checked',
+  })
+  async checkUsernameAvailability(@Param('username') username: string) {
+    // Validate username format
+    if (!username || username.length < 3 || username.length > 20) {
+      throw new HttpException(
+        'Invalid username format',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      throw new HttpException(
+        'Username can only contain letters, numbers, and underscores',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const existingUser = await this.usersService.findByUsername(username);
+
+    return {
+      available: !existingUser,
+      username: username,
+      message: existingUser
+        ? 'Username is already taken'
+        : 'Username is available',
+    };
   }
 
   @Get('moderators')
@@ -102,9 +149,7 @@ export class UsersController {
   })
   async getCurrentUser(@CurrentUser() currentUser: any) {
     const user = await this.usersService.findOne(currentUser.mongoId);
-    return plainToClass(UserResponseDto, user.toObject(), {
-      excludeExtraneousValues: true,
-    });
+    return this.formatUserResponse(user);
   }
 
   @Get('profile/:supabaseId')
@@ -120,9 +165,7 @@ export class UsersController {
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
-    return plainToClass(UserResponseDto, user.toObject(), {
-      excludeExtraneousValues: true,
-    });
+    return this.formatUserResponse(user);
   }
 
   @Get(':id')
@@ -168,9 +211,8 @@ export class UsersController {
         currentUser.mongoId,
         updateProfileDto,
       );
-      return plainToClass(UserResponseDto, user.toObject(), {
-        excludeExtraneousValues: true,
-      });
+
+      return this.formatUserResponse(user);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

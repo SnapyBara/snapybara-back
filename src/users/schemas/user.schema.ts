@@ -16,8 +16,8 @@ export class User {
   @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ required: true })
-  username: string;
+  @Prop({ required: false, unique: true, sparse: true })
+  username?: string;
 
   @Prop({ required: false })
   profilePicture?: string;
@@ -82,7 +82,8 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-UserSchema.index({ username: 1 });
+// Sparse index allows null values while maintaining uniqueness for non-null values
+UserSchema.index({ username: 1 }, { unique: true, sparse: true });
 UserSchema.index({ points: -1 });
 UserSchema.index({ level: -1 });
 UserSchema.index({ createdAt: -1 });
