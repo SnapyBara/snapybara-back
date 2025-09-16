@@ -12,7 +12,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { UsersService } from '../users/users.service';
-import { JwtService } from '@nestjs/jwt';
+import { AuthService } from '../auth/auth.service';
 
 @WebSocketGateway({
   cors: {
@@ -33,7 +33,7 @@ export class NotificationsGateway
   constructor(
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
+    private readonly authService: AuthService,
   ) {}
 
   afterInit(server: Server) {
@@ -44,26 +44,34 @@ export class NotificationsGateway
     try {
       // Extraire le token JWT de la requête
       const token = this.extractTokenFromClient(client);
-      
+
       if (!token) {
         this.logger.error('No token provided');
         client.disconnect();
         return;
       }
 
-      // Vérifier le token et récupérer l'utilisateur
-      const payload = await this.verifyToken(token);
-      const userId = payload?.sub;
+      // Vérifier le token Supabase et récupérer l'utilisateur
+      const user = await this.verifySupabaseToken(token);
+
+      if (!user) {
+        this.logger.error('Invalid token or user not found');
+        client.disconnect();
+        return;
+      }
+
+      // Utiliser mongoId au lieu de id
+      const userId = user.mongoId;
 
       if (!userId) {
-        this.logger.error('Invalid token');
+        this.logger.error('User ID not found in token validation');
         client.disconnect();
         return;
       }
 
       // Stocker la connexion
       client.data.userId = userId;
-      
+
       if (!this.connectedClients.has(userId)) {
         this.connectedClients.set(userId, new Set());
       }
@@ -75,17 +83,34 @@ export class NotificationsGateway
       // Rejoindre une room spécifique à l'utilisateur
       client.join(`user:${userId}`);
 
-      this.logger.log(`Client connected: ${client.id} for user ${userId}`);
+      this.logger.log(
+        `Client connected: ${client.id} for user ${user.email} (${userId})`,
+      );
 
       // Envoyer les notifications non lues
-      const { data: unreadNotifications, unreadCount } = 
+      const { data: unreadNotifications, unreadCount } =
         await this.notificationsService.findByUser(userId, { isRead: false });
 
+      // S'assurer que chaque notification a bien un ID string
+      const notificationsToSend = unreadNotifications.map((notification) => ({
+        id: notification._id?.toString(),
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        data: notification.data,
+        isRead: notification.isRead || false,
+        createdAt: notification.createdAt,
+        userId: notification.userId?.toString(),
+      }));
+
+      this.logger.log(
+        `Sending ${notificationsToSend.length} initial notifications with IDs: ${notificationsToSend.map((n) => n.id).join(', ')}`,
+      );
+
       client.emit('initial_notifications', {
-        notifications: unreadNotifications,
+        notifications: notificationsToSend,
         unreadCount,
       });
-
     } catch (error) {
       this.logger.error('Connection error:', error);
       client.disconnect();
@@ -94,12 +119,12 @@ export class NotificationsGateway
 
   handleDisconnect(client: Socket) {
     const userId = client.data.userId;
-    
+
     if (userId && this.connectedClients.has(userId)) {
       const socketIds = this.connectedClients.get(userId);
       if (socketIds) {
         socketIds.delete(client.id);
-        
+
         if (socketIds.size === 0) {
           this.connectedClients.delete(userId);
         }
@@ -119,14 +144,40 @@ export class NotificationsGateway
       data?: any;
     },
   ) {
-    // Créer la notification dans la base de données
-    const savedNotification = await this.notificationsService.create({
-      userId,
-      ...notification,
-    });
+    try {
+      // Créer la notification dans la base de données
+      const savedNotification = await this.notificationsService.create({
+        userId,
+        ...notification,
+      });
 
-    // Envoyer la notification via WebSocket si l'utilisateur est connecté
-    this.server.to(`user:${userId}`).emit('new_notification', savedNotification);
+      this.logger.log(
+        `Created notification with ID: ${savedNotification._id} for user ${userId}`,
+      );
+
+      // S'assurer que l'objet envoyé contient bien l'ID et le convertir en string
+      const notificationToSend = {
+        id: savedNotification._id?.toString(),
+        type: savedNotification.type,
+        title: savedNotification.title,
+        message: savedNotification.message,
+        data: savedNotification.data,
+        isRead: savedNotification.isRead || false,
+        createdAt: savedNotification.createdAt,
+        userId: savedNotification.userId?.toString(),
+      };
+
+      this.logger.log(
+        `Sending notification via WebSocket: ${JSON.stringify(notificationToSend)}`,
+      );
+
+      // Envoyer la notification via WebSocket si l'utilisateur est connecté
+      this.server
+        .to(`user:${userId}`)
+        .emit('new_notification', notificationToSend);
+    } catch (error) {
+      this.logger.error(`Failed to send notification: ${error.message}`);
+    }
   }
 
   // Méthode pour notifier un gain de points
@@ -201,7 +252,7 @@ export class NotificationsGateway
     @ConnectedSocket() client: Socket,
   ) {
     const userId = client.data.userId;
-    
+
     if (!userId) {
       return { error: 'Not authenticated' };
     }
@@ -217,7 +268,7 @@ export class NotificationsGateway
   @SubscribeMessage('mark_all_read')
   async handleMarkAllAsRead(@ConnectedSocket() client: Socket) {
     const userId = client.data.userId;
-    
+
     if (!userId) {
       return { error: 'Not authenticated' };
     }
@@ -233,7 +284,7 @@ export class NotificationsGateway
   @SubscribeMessage('get_unread_count')
   async handleGetUnreadCount(@ConnectedSocket() client: Socket) {
     const userId = client.data.userId;
-    
+
     if (!userId) {
       return { error: 'Not authenticated' };
     }
@@ -267,7 +318,7 @@ export class NotificationsGateway
     if (cookies) {
       const tokenCookie = cookies
         .split(';')
-        .find(c => c.trim().startsWith('access_token='));
+        .find((c) => c.trim().startsWith('access_token='));
       if (tokenCookie) {
         return tokenCookie.split('=')[1];
       }
@@ -276,9 +327,19 @@ export class NotificationsGateway
     return null;
   }
 
-  private async verifyToken(token: string): Promise<any> {
+  private async verifySupabaseToken(token: string): Promise<any> {
     try {
-      return await this.jwtService.verifyAsync(token);
+      // Utiliser le AuthService pour vérifier le token Supabase
+      // Le AuthService devrait avoir une méthode pour valider le token Supabase
+      const user = await this.authService.validateSupabaseToken(token);
+
+      if (user) {
+        this.logger.log(`Token validated for user: ${user.email}`);
+        return user;
+      }
+
+      this.logger.error('Token validation failed: user not found');
+      return null;
     } catch (error) {
       this.logger.error('Token verification failed:', error);
       return null;

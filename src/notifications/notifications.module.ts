@@ -9,6 +9,7 @@ import {
   NotificationSchema,
 } from './schemas/notification.schema';
 import { UsersModule } from '../users/users.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { UsersModule } from '../users/users.module';
       signOptions: { expiresIn: '7d' },
     }),
     forwardRef(() => UsersModule),
+    forwardRef(() => AuthModule),
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsGateway],

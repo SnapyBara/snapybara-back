@@ -26,7 +26,10 @@ export class NotificationsService {
       ...notificationData,
       userId: new Types.ObjectId(notificationData.userId),
     });
-    return notification.save();
+    const saved = await notification.save();
+
+    // Retourner le document avec l'ID généré
+    return saved.toObject();
   }
 
   async findByUser(
@@ -149,7 +152,7 @@ export class NotificationsService {
       priority: 'medium',
     });
   }
-  
+
   async notifyPhotoLiked(
     photoOwnerId: string,
     likedByUserId: string,
