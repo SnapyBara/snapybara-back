@@ -53,6 +53,8 @@
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/throttler": "^6.4.0",
+    "@nestjs/websockets": "^11.1.6",
+    "@nestjs/platform-socket.io": "^11.1.6",
     "@sentry/integrations": "^7.114.0",
     "@sentry/node": "^10.5.0",
     "@supabase/supabase-js": "^2.55.0",
@@ -79,6 +81,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "sharp": "^0.34.3",
+    "socket.io": "^4.7.5",
     "streamifier": "^0.1.1",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0"

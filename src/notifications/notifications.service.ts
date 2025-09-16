@@ -131,6 +131,25 @@ export class NotificationsService {
   }
 
   // Helper methods for creating specific notification types
+  async notifyPointApproved(
+    userId: string,
+    pointName: string,
+    pointId: string,
+  ): Promise<void> {
+    await this.create({
+      userId,
+      type: 'point_approved',
+      title: 'Point approuvé !',
+      message: `Votre point "${pointName}" a été approuvé par un modérateur.`,
+      data: {
+        entityType: 'point',
+        entityId: pointId,
+        pointName,
+      },
+      priority: 'medium',
+    });
+  }
+  
   async notifyPhotoLiked(
     photoOwnerId: string,
     likedByUserId: string,

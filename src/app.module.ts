@@ -24,6 +24,7 @@ import { GraphqlModule } from './graphql/graphql.module';
 import { CacheModule as CustomCacheModule } from './cache/cache.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { DebugModule } from './debug/debug.module';
+import { GamificationModule } from './gamification/gamification.module';
 
 import { SecurityLoggingInterceptor } from './common/interceptors/security-logging.interceptor';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
@@ -115,6 +116,7 @@ import { SecurityMiddleware } from './common/middleware/security.middleware';
     GraphqlModule,
     CustomCacheModule,
     DebugModule,
+    GamificationModule,
   ],
   controllers: [AppController],
   providers: [

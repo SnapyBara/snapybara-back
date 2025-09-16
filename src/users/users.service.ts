@@ -158,6 +158,38 @@ export class UsersService {
     return updatedUser;
   }
 
+  async updateLevel(id: string, level: number): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    const updatedUser = await this.update(id, {
+      level: level,
+    });
+
+    this.logger.log(`Level updated for ${user.username}: ${level}`);
+    return updatedUser;
+  }
+
+  async incrementPhotoCount(id: string): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    return this.update(id, { photosUploaded: user.photosUploaded + 1 });
+  }
+
+  async incrementPOICount(id: string): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    return this.update(id, {
+      pointsOfInterestCreated: user.pointsOfInterestCreated + 1,
+    });
+  }
+
+  async incrementCommentCount(id: string): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    return this.update(id, { commentsWritten: user.commentsWritten + 1 });
+  }
+
+  async incrementLikesReceived(id: string): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    return this.update(id, { likesReceived: user.likesReceived + 1 });
+  }
+
   async addAchievement(
     id: string,
     achievementId: string,
