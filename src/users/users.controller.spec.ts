@@ -163,6 +163,33 @@ describe('UsersController', () => {
     });
   });
 
+  describe('checkUsernameAvailability', () => {
+    it('should return available when username is free', async () => {
+      mockUsersService.findByUsername.mockResolvedValue(null);
+
+      const result = await controller.checkUsernameAvailability('freename');
+
+      expect(usersService.findByUsername).toHaveBeenCalledWith('freename');
+      expect(result).toEqual({
+        available: true,
+        username: 'freename',
+        message: 'Username is available',
+      });
+    });
+
+    it('should return unavailable when username is taken', async () => {
+      mockUsersService.findByUsername.mockResolvedValue(mockUser);
+
+      const result = await controller.checkUsernameAvailability('testuser');
+
+      expect(result).toEqual({
+        available: false,
+        username: 'testuser',
+        message: 'Username is already taken',
+      });
+    });
+  });
+
   describe('getProfileBySupabaseId', () => {
     it('should return user profile by supabase ID', async () => {
       mockUsersService.findBySupabaseId.mockResolvedValue(mockUser);

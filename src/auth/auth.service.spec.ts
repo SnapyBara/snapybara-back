@@ -240,6 +240,37 @@ describe('AuthService', () => {
     });
   });
 
+  describe('validateSupabaseToken edge cases', () => {
+    it('should throw when token payload has no sub', async () => {
+      mockJwtVerify.mockResolvedValueOnce({
+        payload: { email: 'test@example.com' },
+        protectedHeader: { alg: 'ES256' },
+      });
+
+      await expect(service.validateSupabaseToken('token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockUsersService.findBySupabaseId).not.toHaveBeenCalled();
+    });
+
+    it('should throw when user is missing in Mongo and Supabase', async () => {
+      mockJwtVerify.mockResolvedValueOnce({
+        payload: { sub: 'user-123', email: 'test@example.com' },
+        protectedHeader: { alg: 'ES256' },
+      });
+      mockUsersService.findBySupabaseId.mockResolvedValueOnce(null);
+      mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: 'User not found' },
+      });
+
+      await expect(service.validateSupabaseToken('token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockUsersService.syncWithSupabase).not.toHaveBeenCalled();
+    });
+  });
+
   describe('loginWithSupabase', () => {
     it('should login with Supabase', async () => {
       const email = 'test@example.com';
