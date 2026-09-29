@@ -16,7 +16,16 @@ jest.mock('@supabase/supabase-js', () => ({
   })),
 }));
 
+// Mock jose (JWT verification via Supabase JWKS)
+jest.mock('jose', () => ({
+  createRemoteJWKSet: jest.fn(() => jest.fn()),
+  jwtVerify: jest.fn(),
+}));
+
 import { createClient } from '@supabase/supabase-js';
+import { jwtVerify } from 'jose';
+
+const mockJwtVerify = jwtVerify as jest.Mock;
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -50,6 +59,12 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    // Reset queued mockResolvedValueOnce values so a failing test
+    // cannot leak its mocks into the next ones
+    mockJwtVerify.mockReset();
+    Object.values(mockUsersService).forEach((fn) => fn.mockReset());
+    mockJwtService.sign.mockReset();
+    mockJwtService.verify.mockReset();
 
     mockSupabaseClient = (createClient as jest.Mock).mock.results[0]?.value || {
       auth: {
@@ -160,9 +175,9 @@ describe('AuthService', () => {
         isActive: true,
       };
 
-      mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockSupabaseUser },
-        error: null,
+      mockJwtVerify.mockResolvedValueOnce({
+        payload: { sub: mockSupabaseUser.id, email: mockSupabaseUser.email },
+        protectedHeader: { alg: 'ES256' },
       });
       mockUsersService.findBySupabaseId.mockResolvedValueOnce(mockMongoUser);
       mockUsersService.updateLastLogin.mockResolvedValueOnce(undefined);
@@ -182,10 +197,7 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException for invalid token', async () => {
       const token = 'invalid-token';
 
-      mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
-        data: { user: null },
-        error: { message: 'Invalid token' },
-      });
+      mockJwtVerify.mockRejectedValueOnce(new Error('Invalid Compact JWS'));
 
       await expect(service.validateSupabaseToken(token)).rejects.toThrow(
         UnauthorizedException,
@@ -207,6 +219,10 @@ describe('AuthService', () => {
         isActive: true,
       };
 
+      mockJwtVerify.mockResolvedValueOnce({
+        payload: { sub: mockSupabaseUser.id, email: mockSupabaseUser.email },
+        protectedHeader: { alg: 'ES256' },
+      });
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: mockSupabaseUser },
         error: null,
