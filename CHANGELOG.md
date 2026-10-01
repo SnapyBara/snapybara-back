@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0](https://github.com/SnapyBara/snapybara-back/compare/snapybara-back-v0.4.0...snapybara-back-v0.5.0) (2026-10-01)
+
+
+### Features
+
+* **auth:** add check-username route and verify supabase jwt via jwks ([75f5212](https://github.com/SnapyBara/snapybara-back/commit/75f52129bc74c48a4cae7fe711e6251592d214e0))
+* **auth:** add check-username route and verify supabase jwt via jwks ([02f7953](https://github.com/SnapyBara/snapybara-back/commit/02f79532de2b4df9e2c0dbbf3a38bd55d566e9fb))
+
+
+### Bug Fixes
+
+* **api:** change username check road to remove auth guard ([42099e6](https://github.com/SnapyBara/snapybara-back/commit/42099e64a2e6adde83a5514c8d2f109a9fb6b4df))
+* **global:** dockerfile.production run wrong ci command ([7ef0abe](https://github.com/SnapyBara/snapybara-back/commit/7ef0abe201255b9f4f14570f1cc68a8111c15d3c))
+* **global:** dockerfile.production run wrong ci command ([a48e02d](https://github.com/SnapyBara/snapybara-back/commit/a48e02d0dff3f0d3ffeca9219d74cfd9d6c3ae7f))
+* **global:** remove unused vairable and function ([9bb3e2d](https://github.com/SnapyBara/snapybara-back/commit/9bb3e2d246aad2f7a922e8cc49636798f47c1b3c))
+* **global:** remove unused vairable and function ([c0efcd1](https://github.com/SnapyBara/snapybara-back/commit/c0efcd1c9ed4823c1ed2fde1a7a5db225a7e2851))
+
 ## [0.4.0](https://github.com/SnapyBara/snapybara-back/compare/snapybara-back-v0.3.0...snapybara-back-v0.4.0) (2025-08-15)
 
 
