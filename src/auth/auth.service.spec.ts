@@ -19,13 +19,15 @@ jest.mock('@supabase/supabase-js', () => ({
 // Mock jose (JWT verification via Supabase JWKS)
 jest.mock('jose', () => ({
   createRemoteJWKSet: jest.fn(() => jest.fn()),
+  decodeProtectedHeader: jest.fn(),
   jwtVerify: jest.fn(),
 }));
 
 import { createClient } from '@supabase/supabase-js';
-import { jwtVerify } from 'jose';
+import { decodeProtectedHeader, jwtVerify } from 'jose';
 
 const mockJwtVerify = jwtVerify as jest.Mock;
+const mockDecodeHeader = decodeProtectedHeader as jest.Mock;
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -62,6 +64,8 @@ describe('AuthService', () => {
     // Reset queued mockResolvedValueOnce values so a failing test
     // cannot leak its mocks into the next ones
     mockJwtVerify.mockReset();
+    mockDecodeHeader.mockReset();
+    mockDecodeHeader.mockReturnValue({ alg: 'ES256' });
     Object.values(mockUsersService).forEach((fn) => fn.mockReset());
     mockJwtService.sign.mockReset();
     mockJwtService.verify.mockReset();
@@ -268,6 +272,63 @@ describe('AuthService', () => {
         UnauthorizedException,
       );
       expect(mockUsersService.syncWithSupabase).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('validateSupabaseToken with legacy HS256 tokens', () => {
+    const mongoUser = {
+      _id: 'mongo-123',
+      supabaseId: 'user-123',
+      email: 'test@example.com',
+      role: 'user',
+      username: 'testuser',
+      isActive: true,
+    };
+
+    it('should verify HS256 tokens with the legacy JWT secret', async () => {
+      mockDecodeHeader.mockReturnValueOnce({ alg: 'HS256' });
+      mockJwtVerify.mockResolvedValueOnce({
+        payload: { sub: 'user-123', email: 'test@example.com' },
+        protectedHeader: { alg: 'HS256' },
+      });
+      mockUsersService.findBySupabaseId.mockResolvedValueOnce(mongoUser);
+
+      const result = await service.validateSupabaseToken('legacy-token');
+
+      expect(mockJwtVerify).toHaveBeenCalledWith(
+        'legacy-token',
+        expect.any(Uint8Array),
+        { algorithms: ['HS256'] },
+      );
+      expect(result.username).toBe('testuser');
+    });
+
+    it('should fall back to Supabase getUser when no legacy secret', async () => {
+      (service as any).legacyJwtSecret = undefined;
+      mockDecodeHeader.mockReturnValueOnce({ alg: 'HS256' });
+      mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
+        data: { user: { id: 'user-123', email: 'test@example.com' } },
+        error: null,
+      });
+      mockUsersService.findBySupabaseId.mockResolvedValueOnce(mongoUser);
+
+      const result = await service.validateSupabaseToken('legacy-token');
+
+      expect(mockJwtVerify).not.toHaveBeenCalled();
+      expect(result.supabaseId).toBe('user-123');
+    });
+
+    it('should reject HS256 tokens rejected by Supabase', async () => {
+      (service as any).legacyJwtSecret = undefined;
+      mockDecodeHeader.mockReturnValueOnce({ alg: 'HS256' });
+      mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: 'invalid' },
+      });
+
+      await expect(
+        service.validateSupabaseToken('legacy-token'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 

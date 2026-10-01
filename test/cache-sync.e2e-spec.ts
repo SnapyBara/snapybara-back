@@ -9,6 +9,9 @@ import { TestAuthGuard } from '../src/auth/guards/test-auth.guard';
 import { SupabaseService } from '../src/supabase/supabase.service';
 import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
 import { mockSupabaseService } from './test-config';
+import { getModelToken } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { PointOfInterest } from '../src/points/schemas/point-of-interest.schema';
 
 describe('Cache Synchronization Integration (e2e)', () => {
   let app: INestApplication;
@@ -44,6 +47,13 @@ describe('Cache Synchronization Integration (e2e)', () => {
     cacheManager = app.get<Cache>(CACHE_MANAGER);
 
     await app.init();
+
+    // Make sure geospatial (2dsphere) indexes exist before running $geoNear
+    // queries: Mongoose builds indexes in the background after app.init().
+    const poiModel = app.get<Model<PointOfInterest>>(
+      getModelToken(PointOfInterest.name),
+    );
+    await poiModel.init();
 
     authToken = 'test-token';
 
