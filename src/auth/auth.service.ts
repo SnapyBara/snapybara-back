@@ -3,13 +3,19 @@ import { JwtService } from '@nestjs/jwt';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
-import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
+import {
+  createRemoteJWKSet,
+  decodeProtectedHeader,
+  jwtVerify,
+  JWTPayload,
+} from 'jose';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private supabase: SupabaseClient;
   private jwks: ReturnType<typeof createRemoteJWKSet>;
+  private legacyJwtSecret?: Uint8Array;
 
   constructor(
     private jwtService: JwtService,
@@ -27,13 +33,51 @@ export class AuthService {
     this.jwks = createRemoteJWKSet(
       new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
     );
+
+    const legacySecret = this.configService.get<string>('SUPABASE_JWT_SECRET');
+    if (legacySecret) {
+      this.legacyJwtSecret = new TextEncoder().encode(legacySecret);
+    }
+  }
+
+  /**
+   * Verify a Supabase access token.
+   * - ES256/RS256 (new JWT signing keys): verified against the project JWKS
+   * - HS256 (legacy JWT secret): verified with SUPABASE_JWT_SECRET,
+   *   or through Supabase Auth if the secret is not configured
+   */
+  private async verifySupabaseJwt(token: string): Promise<JWTPayload> {
+    const { alg } = decodeProtectedHeader(token);
+
+    if (alg === 'HS256') {
+      if (this.legacyJwtSecret) {
+        const { payload } = await jwtVerify<JWTPayload>(
+          token,
+          this.legacyJwtSecret,
+          { algorithms: ['HS256'] },
+        );
+        return payload;
+      }
+
+      const {
+        data: { user },
+        error,
+      } = await this.supabase.auth.getUser(token);
+      if (error || !user) {
+        throw new UnauthorizedException('Invalid legacy token');
+      }
+      return { sub: user.id, email: user.email } as JWTPayload;
+    }
+
+    const { payload } = await jwtVerify<JWTPayload>(token, this.jwks, {
+      algorithms: ['ES256', 'RS256'],
+    });
+    return payload;
   }
 
   async validateSupabaseToken(token: string): Promise<any> {
     try {
-      const { payload } = await jwtVerify<JWTPayload>(token, this.jwks, {
-        algorithms: ['ES256', 'RS256'],
-      });
+      const payload = await this.verifySupabaseJwt(token);
 
       const supabaseUserId = payload.sub;
       if (!supabaseUserId) {
