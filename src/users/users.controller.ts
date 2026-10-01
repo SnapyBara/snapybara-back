@@ -107,6 +107,25 @@ export class UsersController {
     });
   }
 
+  @Get('check-username/:username')
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({ summary: 'Check if username is available' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Username availability status',
+  })
+  async checkUsernameAvailability(@Param('username') username: string) {
+    const existingUser = await this.usersService.findByUsername(username);
+    return {
+      available: !existingUser,
+      username: username,
+      message: existingUser
+        ? 'Username is already taken'
+        : 'Username is available',
+    };
+  }
+
   @Get('profile/:supabaseId')
   @UseGuards(OwnerGuard)
   @ApiOperation({ summary: 'Get user profile by Supabase ID' })

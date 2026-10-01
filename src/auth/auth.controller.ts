@@ -27,14 +27,13 @@ import { OAuth2Client } from 'google-auth-library';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  private googleClient: OAuth2Client;
+  private googleClient: OAuth2Client | undefined;
   private supabaseAdmin;
 
   constructor(
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
   ) {
-    // Initialiser le client Google OAuth si les variables sont présentes
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
     if (googleClientId) {
       this.googleClient = new OAuth2Client(googleClientId);
