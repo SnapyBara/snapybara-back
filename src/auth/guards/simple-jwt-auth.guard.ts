@@ -19,7 +19,6 @@ export class SimpleJwtAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Check if route is marked as public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -38,7 +37,6 @@ export class SimpleJwtAuthGuard implements CanActivate {
     }
 
     try {
-      // Validate token with Supabase
       const user = await this.authService.validateSupabaseToken(token);
       request.user = user;
       return true;

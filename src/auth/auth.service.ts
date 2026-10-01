@@ -3,11 +3,13 @@ import { JwtService } from '@nestjs/jwt';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
+import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private supabase: SupabaseClient;
+  private jwks: ReturnType<typeof createRemoteJWKSet>;
 
   constructor(
     private jwtService: JwtService,
@@ -22,25 +24,32 @@ export class AuthService {
     }
 
     this.supabase = createClient(supabaseUrl, supabaseKey);
+    this.jwks = createRemoteJWKSet(
+      new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
+    );
   }
 
   async validateSupabaseToken(token: string): Promise<any> {
     try {
-      // Verify the JWT token with Supabase
-      const {
-        data: { user },
-        error,
-      } = await this.supabase.auth.getUser(token);
+      const { payload } = await jwtVerify<JWTPayload>(token, this.jwks, {
+        algorithms: ['ES256', 'RS256'],
+      });
 
-      if (error || !user) {
-        this.logger.warn(`Invalid token: ${error?.message || 'No user found'}`);
-        throw new UnauthorizedException('Invalid authentication token');
+      const supabaseUserId = payload.sub;
+      if (!supabaseUserId) {
+        throw new UnauthorizedException('Invalid token payload');
       }
 
-      // Get or sync user from MongoDB
-      let mongoUser = await this.usersService.findBySupabaseId(user.id);
+      let mongoUser = await this.usersService.findBySupabaseId(supabaseUserId);
 
       if (!mongoUser) {
+        const {
+          data: { user },
+          error,
+        } = await this.supabase.auth.getUser(token);
+        if (error || !user) {
+          throw new UnauthorizedException('User not found in Supabase');
+        }
         mongoUser = await this.usersService.syncWithSupabase(user);
       }
 
@@ -53,16 +62,16 @@ export class AuthService {
       );
 
       return {
-        supabaseId: user.id,
+        supabaseId: supabaseUserId,
         mongoId: mongoUser._id?.toString() || '',
-        email: user.email,
+        email: (payload as any).email || mongoUser.email,
         username: mongoUser.username,
         role: mongoUser.role || 'user',
         isActive: mongoUser.isActive,
       };
     } catch (error) {
       this.logger.error('Token validation failed:', error);
-      throw new UnauthorizedException('Authentication failed');
+      throw new UnauthorizedException('Invalid authentication token');
     }
   }
 
@@ -85,7 +94,6 @@ export class AuthService {
 
   async loginWithSupabase(email: string, password: string): Promise<any> {
     try {
-      // Sign in with Supabase
       const { data, error } = await this.supabase.auth.signInWithPassword({
         email,
         password,
@@ -181,25 +189,23 @@ export class AuthService {
   }
 
   async generateSupabaseCompatibleToken(user: any) {
-    // Générer un token JWT avec les claims Supabase
     const payload = {
-      sub: user.id, // Supabase user ID
+      sub: user.id,
       email: user.email,
       role: 'authenticated',
       aud: 'authenticated',
       iss: this.configService.get<string>('SUPABASE_URL') + '/auth/v1',
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+      exp: Math.floor(Date.now() / 1000) + 3600,
     };
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('SUPABASE_JWT_SECRET'),
     });
 
-    // Pour le refresh token, on peut utiliser un token plus long
     const refreshPayload = {
       ...payload,
-      exp: Math.floor(Date.now() / 1000) + 604800, // 7 days
+      exp: Math.floor(Date.now() / 1000) + 604800,
     };
 
     const refreshToken = this.jwtService.sign(refreshPayload, {

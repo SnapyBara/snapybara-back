@@ -19,7 +19,6 @@ export class ImageFileValidator extends FileValidator {
       return false;
     }
 
-    // Check for path traversal attempts
     if (this.hasPathTraversal(file.originalname)) {
       return false;
     }
@@ -32,21 +31,17 @@ export class ImageFileValidator extends FileValidator {
       return false;
     }
 
-    // Check MIME type
     const mimeTypeValid = this.allowedMimeTypes.includes(file.mimetype);
 
-    // Check file extension
     const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
     const extensionValid = fileExtension
       ? this.allowedExtensions.includes(fileExtension)
       : false;
 
-    // Both MIME type and extension must be valid
     return mimeTypeValid && extensionValid;
   }
 
   private hasPathTraversal(filename: string): boolean {
-    // Check for common path traversal patterns
     const dangerousPatterns = [
       '..',
       '../',
