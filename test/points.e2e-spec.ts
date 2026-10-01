@@ -13,6 +13,9 @@ import {
   mockCacheManager,
   mockUsersService,
 } from './test-config';
+import { getModelToken } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { PointOfInterest } from '../src/points/schemas/point-of-interest.schema';
 
 describe('Points API (e2e)', () => {
   let app: INestApplication;
@@ -59,6 +62,13 @@ describe('Points API (e2e)', () => {
     );
 
     await app.init();
+
+    // Make sure geospatial (2dsphere) indexes exist before running $geoNear
+    // queries: Mongoose builds indexes in the background after app.init().
+    const poiModel = app.get<Model<PointOfInterest>>(
+      getModelToken(PointOfInterest.name),
+    );
+    await poiModel.init();
 
     // Create a test JWT service and token
     const jwtService = new JwtService({
