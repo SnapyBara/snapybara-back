@@ -47,9 +47,11 @@ describe('Schemas', () => {
       expect(emailPath.options.unique).toBe(true);
       expect(supabaseIdPath.options.unique).toBe(true);
 
-      // username doesn't have unique constraint in schema
+      // username has unique constraint but is optional (sparse index)
       const usernamePath = schema.path('username') as any;
-      expect(usernamePath.options.required).toBe(true);
+      expect(usernamePath.options.unique).toBe(true);
+      expect(usernamePath.options.sparse).toBe(true);
+      expect(usernamePath.options.required).toBe(false);
     });
 
     it('should have default values', () => {

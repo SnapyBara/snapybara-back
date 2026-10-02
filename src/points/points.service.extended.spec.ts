@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { GamificationService } from '../gamification/gamification.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { PointsService } from './points.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { PhotosService } from '../photos/photos.service';
@@ -89,6 +91,11 @@ describe('PointsService Extended Tests', () => {
         },
         { provide: UsersService, useValue: mockUsersService },
         { provide: CacheService, useValue: mockCacheService },
+        {
+          provide: GamificationService,
+          useValue: { awardPointsForPOICreation: jest.fn() },
+        },
+        { provide: NotificationsGateway, useValue: {} },
       ],
     }).compile();
 
@@ -215,7 +222,7 @@ describe('PointsService Extended Tests', () => {
       const mockPoint = { _id: pointId, status: 'pending' };
       const mockUpdatedPoint = { ...mockPoint, status: 'approved' };
 
-      mockPointModel.findById.mockResolvedValueOnce(mockPoint);
+      mockPointModel.populate.mockResolvedValueOnce(mockPoint);
       mockPointModel.exec.mockResolvedValueOnce(mockUpdatedPoint);
 
       const result = await service.updatePointStatus(
@@ -241,7 +248,7 @@ describe('PointsService Extended Tests', () => {
       const mockPoint = { _id: pointId, status: 'pending' };
       const mockUpdatedPoint = { ...mockPoint, status: 'rejected' };
 
-      mockPointModel.findById.mockResolvedValueOnce(mockPoint);
+      mockPointModel.populate.mockResolvedValueOnce(mockPoint);
       mockPointModel.exec.mockResolvedValueOnce(mockUpdatedPoint);
 
       const result = await service.updatePointStatus(
