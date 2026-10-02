@@ -13,6 +13,8 @@ import { OverpassModule } from '../overpass/overpass.module';
 import { UsersModule } from '../users/users.module';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { CacheModule } from '../cache/cache.module';
+import { GamificationModule } from '../gamification/gamification.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { CacheModule } from '../cache/cache.module';
     UsersModule,
     ReviewsModule,
     CacheModule,
+    GamificationModule,
+    NotificationsModule,
   ],
   controllers: [PointsController],
   providers: [PointsService],

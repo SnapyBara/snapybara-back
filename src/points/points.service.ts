@@ -23,6 +23,8 @@ import { PhotoEnrichmentService } from '../overpass/photo-enrichment.service';
 import { UsersService } from '../users/users.service';
 import { CacheService } from '../cache/cache.service';
 import { Express } from 'express';
+import { GamificationService } from '../gamification/gamification.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class PointsService {
@@ -38,6 +40,8 @@ export class PointsService {
     private photoEnrichmentService: PhotoEnrichmentService,
     private usersService: UsersService,
     private cacheService: CacheService,
+    private gamificationService: GamificationService,
+    private notificationsGateway: NotificationsGateway,
   ) {}
 
   /**
@@ -77,6 +81,12 @@ export class PointsService {
       },
     });
     const savedPoint = await createdPoint.save();
+
+    // Attribuer des points pour la création du POI
+    await this.gamificationService.awardPointsForPOICreation(
+      user._id.toString(),
+    );
+
     await this.invalidateAreaCache(
       createPointDto.latitude,
       createPointDto.longitude,
@@ -1493,10 +1503,12 @@ export class PointsService {
       throw new BadRequestException('Invalid point ID');
     }
 
-    const point = await this.pointModel.findById(id);
+    const point = await this.pointModel.findById(id).populate('userId');
     if (!point) {
       throw new NotFoundException('Point not found');
     }
+
+    const previousStatus = point.status;
 
     const updateData: any = {
       status,
@@ -1519,6 +1531,48 @@ export class PointsService {
 
     if (!updated) {
       throw new NotFoundException('Point not found');
+    }
+
+    // Si le point passe de pending à approved, attribuer des points et envoyer notification
+    if (previousStatus === 'pending' && status === 'approved' && point.userId) {
+      try {
+        // Extraire l'ID de l'utilisateur de façon sûre
+        let userId: string;
+        const userIdValue: any = point.userId;
+
+        if (userIdValue._id) {
+          // C'est un document peuplé
+          userId = userIdValue._id.toString();
+        } else if (typeof userIdValue.toString === 'function') {
+          // C'est un ObjectId ou une string
+          userId = userIdValue.toString();
+        } else {
+          // Cas par défaut
+          userId = String(userIdValue);
+        }
+
+        // Attribuer des points pour la validation
+        await this.gamificationService.awardPointsForPOIValidation(userId);
+        this.logger.log(`Points awarded to user ${userId} for POI validation`);
+
+        // Envoyer une notification d'approbation
+        await this.notificationsGateway.sendNotificationToUser(userId, {
+          type: 'point_approved',
+          title: 'Point validé !',
+          message: `Félicitations ! Votre point "${updated.name}" a été approuvé et est maintenant visible par tous.`,
+          data: {
+            entityType: 'point',
+            entityId: updated._id.toString(),
+            pointName: updated.name,
+          },
+        });
+
+        this.logger.log(`Notification sent to user ${userId} for POI approval`);
+      } catch (error) {
+        this.logger.error(
+          `Failed to award points or send notification for POI validation: ${error.message}`,
+        );
+      }
     }
 
     // TODO: Send notification to user about status change

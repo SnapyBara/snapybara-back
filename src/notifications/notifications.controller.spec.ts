@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UsersService } from '../users/users.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
@@ -20,6 +21,10 @@ describe('NotificationsController', () => {
     clearOldNotifications: jest.fn(),
   };
 
+  const mockUsersService = {
+    findBySupabaseId: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationsController],
@@ -28,6 +33,7 @@ describe('NotificationsController', () => {
           provide: NotificationsService,
           useValue: mockNotificationsService,
         },
+        { provide: UsersService, useValue: mockUsersService },
       ],
     })
       .overrideGuard(SupabaseAuthGuard)
@@ -37,6 +43,7 @@ describe('NotificationsController', () => {
     controller = module.get<NotificationsController>(NotificationsController);
     service = module.get<NotificationsService>(NotificationsService);
     jest.clearAllMocks();
+    mockUsersService.findBySupabaseId.mockResolvedValue({ _id: mockUser.id });
   });
 
   describe('findByUser', () => {
@@ -61,7 +68,16 @@ describe('NotificationsController', () => {
       const result = await controller.findByUser(req);
 
       expect(service.findByUser).toHaveBeenCalledWith(mockUser.id, {});
-      expect(result).toEqual(mockNotifications);
+      expect(result).toEqual({
+        ...mockNotifications,
+        data: [
+          expect.objectContaining({
+            id: 'notif-1',
+            title: 'Test notification',
+            isRead: false,
+          }),
+        ],
+      });
     });
 
     it('should pass filters to service', async () => {

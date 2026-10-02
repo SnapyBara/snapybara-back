@@ -27,7 +27,13 @@ describe('NotificationsService', () => {
 
   const mockNotificationModel = jest.fn().mockImplementation((dto) => ({
     ...dto,
-    save: jest.fn().mockResolvedValue({ ...mockNotification, ...dto }),
+    save: jest.fn().mockResolvedValue({
+      ...mockNotification,
+      ...dto,
+      toObject() {
+        return { ...mockNotification, ...dto };
+      },
+    }),
   })) as any;
 
   mockNotificationModel.create = jest.fn();
