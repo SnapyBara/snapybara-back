@@ -51,7 +51,7 @@ export class SupabaseWebhookController {
 
       // Vérification de signature optionnelle en développement
       const webhookSecret = process.env.SUPABASE_WEBHOOK_SECRET;
-      const isDevelopment = process.env.NODE_ENV !== 'production';
+      const isDevelopment = process.env.NODE_ENV === 'development';
 
       if (webhookSecret) {
         // Si un secret est configuré, on vérifie la signature

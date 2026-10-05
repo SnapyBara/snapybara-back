@@ -120,6 +120,7 @@ describe('SupabaseWebhookController', () => {
     });
 
     it('should not throw but log warning without auth header in development', async () => {
+      process.env.NODE_ENV = 'development';
       const payload = { type: 'INSERT', table: 'users', record: {} };
       const result = await controller.handleSupabaseAuthEvent(
         payload,
@@ -135,6 +136,7 @@ describe('SupabaseWebhookController', () => {
     });
 
     it('should not throw but log warning with invalid auth header in development', async () => {
+      process.env.NODE_ENV = 'development';
       const payload = { type: 'INSERT', table: 'users', record: {} };
       const result = await controller.handleSupabaseAuthEvent(
         payload,

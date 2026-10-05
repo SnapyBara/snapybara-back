@@ -306,15 +306,13 @@ export class UsersService {
         notificationsEnabled: true,
         darkModeEnabled: false,
         privacySettings: 'public',
-        language: language ?? 'fr',
+        ...(language ? {} : { language: 'fr' }),
         level: 1,
         points: 0,
         photosUploaded: 0,
         pointsOfInterestCreated: 0,
         commentsWritten: 0,
         likesReceived: 0,
-        // Don't set username on insert if not provided
-        ...(username ? { username } : {}),
       },
       $set: {
         ...(email ? { email } : {}),
@@ -329,36 +327,41 @@ export class UsersService {
       },
     };
 
+    // A path cannot appear in both $setOnInsert and $set (MongoDB conflict error).
+    const upsert = () =>
+      this.userModel.findOneAndUpdate({ supabaseId }, update, {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      });
+
+    let doc: UserDocument;
     try {
-      const doc = await this.userModel.findOneAndUpdate(
-        { supabaseId },
-        update,
-        { upsert: true, new: true, setDefaultsOnInsert: true },
-      );
-
-      // Log the actual username value in the document
-      const actualUsername = doc.username;
-      this.logger.log(
-        `User synced: ${doc.email} (username in DB: ${
-          actualUsername === undefined
-            ? 'undefined'
-            : actualUsername === null
-              ? 'null'
-              : actualUsername === ''
-                ? 'empty string'
-                : `'${actualUsername}'`
-        })`,
-      );
-
-      return doc;
+      doc = await upsert();
     } catch (error: any) {
-      // If there's a duplicate key error and it's NOT about username, throw it
-      if (error?.code === 11000 && !error.message?.includes('username')) {
+      // Concurrent upserts on the same supabaseId: retry once as an update.
+      if (error?.code === 11000 && error?.keyPattern?.supabaseId) {
+        doc = await upsert();
+      } else {
         throw error;
       }
-      // For username conflicts or other errors, just throw
-      throw error;
     }
+
+    // Log the actual username value in the document
+    const actualUsername = doc.username;
+    this.logger.log(
+      `User synced: ${doc.email} (username in DB: ${
+        actualUsername === undefined
+          ? 'undefined'
+          : actualUsername === null
+            ? 'null'
+            : actualUsername === ''
+              ? 'empty string'
+              : `'${actualUsername}'`
+      })`,
+    );
+
+    return doc;
   }
 
   // ===== UTILS =====

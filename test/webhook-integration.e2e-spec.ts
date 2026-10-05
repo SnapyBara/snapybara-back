@@ -153,7 +153,8 @@ describe('Supabase Webhook Integration (e2e)', () => {
       expect(createdUser).toBeTruthy();
       if (createdUser) {
         expect(createdUser.email).toBe('oauth-webhook@gmail.com');
-        expect(createdUser.username).toBeTruthy();
+        // Username is chosen by the user in the app after the first login.
+        expect(createdUser.username).toBeUndefined();
         expect(createdUser.metadata).toBeDefined();
       }
     });
