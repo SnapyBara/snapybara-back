@@ -2,9 +2,13 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as sharp from 'sharp';
+import type Sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import 'multer';
+
+// sharp >= 0.35 exposes ESM-only typings under node10 resolution, while its CJS export has no `default`.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const sharp: typeof Sharp = require('sharp');
 
 export interface UploadedFile {
   originalUrl: string;

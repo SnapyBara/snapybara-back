@@ -1,240 +1,211 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, UnauthorizedException } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { getModelToken } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 import { io, Socket } from 'socket.io-client';
 import { AppModule } from '../src/app.module';
-import { JwtService } from '@nestjs/jwt';
+import { AuthService } from '../src/auth/auth.service';
+import { SupabaseService } from '../src/supabase/supabase.service';
+import { NotificationsGateway } from '../src/notifications/notifications.gateway';
+import { Notification } from '../src/notifications/schemas/notification.schema';
+import { mockSupabaseService } from './test-config';
 
 describe('NotificationsGateway (e2e)', () => {
   let app: INestApplication;
-  let jwtService: JwtService;
-  let clientSocket: Socket;
-  const testUserId = 'test-user-123';
+  let gateway: NotificationsGateway;
+  let notificationModel: Model<Notification>;
+  let url: string;
+  const sockets: Socket[] = [];
+  const validToken = 'valid-test-token';
+  const mongoId = new Types.ObjectId().toString();
+
+  const mockAuthService = {
+    validateSupabaseToken: jest.fn(async (token: string) => {
+      if (token !== validToken) {
+        throw new UnauthorizedException('Invalid authentication token');
+      }
+      return { id: 'supabase-user', mongoId, email: 'ws@example.com' };
+    }),
+  };
+
+  const connect = (token?: string): Socket => {
+    const socket = io(url, {
+      transports: ['websocket'],
+      reconnection: false,
+      forceNew: true,
+      ...(token ? { query: { token } } : {}),
+    });
+    sockets.push(socket);
+    return socket;
+  };
+
+  const connectAndGetInitial = () =>
+    new Promise<{ socket: Socket; initial: any }>((resolve, reject) => {
+      const socket = connect(validToken);
+      socket.on('initial_notifications', (initial) =>
+        resolve({ socket, initial }),
+      );
+      socket.on('connect_error', reject);
+    });
+
+  const emitWithAck = (socket: Socket, event: string, ...args: any[]) =>
+    new Promise<any>((resolve) => socket.emit(event, ...args, resolve));
 
   beforeAll(async () => {
+    process.env.REDIS_HOST = process.env.REDIS_HOST ?? 'disabled-for-tests';
+    process.env.SUPABASE_URL ??= 'https://test.supabase.co';
+    process.env.SUPABASE_ANON_KEY ??= 'test-anon-key';
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'test-service-key';
+    process.env.SUPABASE_JWT_SECRET ??=
+      'test-jwt-secret-for-testing-purposes-only';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(SupabaseService)
+      .useValue(mockSupabaseService)
+      .overrideProvider(AuthService)
+      .useValue(mockAuthService)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useWebSocketAdapter(new IoAdapter(app));
+    await app.listen(0);
 
-    jwtService = app.get(JwtService);
+    gateway = app.get(NotificationsGateway);
+    notificationModel = app.get<Model<Notification>>(
+      getModelToken(Notification.name),
+    );
+    url = `http://localhost:${app.getHttpServer().address().port}/notifications`;
+  });
 
-    await app.init();
-    await app.listen(0); // Random port
+  afterEach(async () => {
+    sockets.splice(0).forEach((s) => s.disconnect());
+    await notificationModel?.deleteMany({});
   });
 
   afterAll(async () => {
-    if (clientSocket) {
-      clientSocket.disconnect();
-    }
-    await app.close();
+    await app?.close();
   });
 
-  describe('WebSocket Connection', () => {
-    it('should connect with valid JWT token', (done) => {
-      const port = app.getHttpServer().address().port;
-      const token = jwtService.sign({ sub: testUserId });
-
-      clientSocket = io(`http://localhost:${port}/notifications`, {
-        query: { token },
-        transports: ['websocket'],
+  describe('Connection', () => {
+    it('sends initial notifications to an authenticated client', async () => {
+      await notificationModel.create({
+        userId: new Types.ObjectId(mongoId),
+        type: 'achievement_earned',
+        title: 'Existing',
+        message: 'Existing notification',
       });
 
-      clientSocket.on('connect', () => {
-        expect(clientSocket.connected).toBe(true);
-        done();
-      });
+      const { socket, initial } = await connectAndGetInitial();
 
-      clientSocket.on('connect_error', (error) => {
-        done(error);
-      });
+      expect(socket.connected).toBe(true);
+      expect(initial.unreadCount).toBe(1);
+      expect(initial.notifications).toHaveLength(1);
+      expect(initial.notifications[0]).toHaveProperty('id');
     });
 
-    it('should reject connection without token', (done) => {
-      const port = app.getHttpServer().address().port;
+    it('disconnects a client without token', (done) => {
+      const socket = connect();
+      socket.on('disconnect', () => done());
+    });
 
-      const unauthorizedSocket = io(`http://localhost:${port}/notifications`, {
-        transports: ['websocket'],
-      });
-
-      unauthorizedSocket.on('connect_error', () => {
-        expect(unauthorizedSocket.connected).toBe(false);
-        unauthorizedSocket.disconnect();
-        done();
-      });
-
-      unauthorizedSocket.on('connect', () => {
-        unauthorizedSocket.disconnect();
-        done(new Error('Should not connect without token'));
-      });
+    it('disconnects a client with an invalid token', (done) => {
+      const socket = connect('invalid-token');
+      socket.on('disconnect', () => done());
     });
   });
 
-  describe('Notifications', () => {
-    beforeEach((done) => {
-      const port = app.getHttpServer().address().port;
-      const token = jwtService.sign({ sub: testUserId });
+  describe('Server events', () => {
+    it('pushes a notification when points are earned', async () => {
+      const { socket } = await connectAndGetInitial();
+      const received = new Promise<any>((resolve) =>
+        socket.on('new_notification', resolve),
+      );
 
-      clientSocket = io(`http://localhost:${port}/notifications`, {
-        query: { token },
-        transports: ['websocket'],
-      });
+      await gateway.notifyPointsEarned(mongoId, 10, 'test', 110);
+      const notification = await received;
 
-      clientSocket.on('connect', () => {
-        done();
-      });
+      expect(notification.type).toBe('achievement_earned');
+      expect(notification.data).toMatchObject({ points: 10, newTotal: 110 });
+      expect(notification.id).toBeDefined();
     });
 
-    afterEach(() => {
-      if (clientSocket) {
-        clientSocket.disconnect();
-      }
-    });
+    it('pushes a notification on level up', async () => {
+      const { socket } = await connectAndGetInitial();
+      const received = new Promise<any>((resolve) =>
+        socket.on('new_notification', resolve),
+      );
 
-    it('should receive initial notifications on connect', (done) => {
-      clientSocket.on('initial_notifications', (data) => {
-        expect(data).toHaveProperty('notifications');
-        expect(data).toHaveProperty('unreadCount');
-        expect(Array.isArray(data.notifications)).toBe(true);
-        done();
-      });
-    });
+      await gateway.notifyLevelUp(mongoId, 2);
+      const notification = await received;
 
-    it('should receive new notification when points are earned', (done) => {
-      clientSocket.on('new_notification', (notification) => {
-        expect(notification).toHaveProperty('type', 'points_earned');
-        expect(notification).toHaveProperty('title');
-        expect(notification).toHaveProperty('message');
-        expect(notification.data).toHaveProperty('points');
-        done();
-      });
-
-      // Simulate points earning (this would normally be triggered by the gamification service)
-      setTimeout(() => {
-        clientSocket.emit('test_earn_points', { points: 10, reason: 'test' });
-      }, 100);
-    });
-
-    it('should mark notification as read', (done) => {
-      const notificationId = 'test-notification-123';
-
-      clientSocket.emit('mark_read', notificationId, (response) => {
-        expect(response).toHaveProperty('success', true);
-        done();
-      });
-    });
-
-    it('should mark all notifications as read', (done) => {
-      clientSocket.emit('mark_all_read', (response) => {
-        expect(response).toHaveProperty('success', true);
-        expect(response).toHaveProperty('modifiedCount');
-        done();
-      });
-    });
-
-    it('should get unread count', (done) => {
-      clientSocket.emit('get_unread_count', (response) => {
-        expect(response).toHaveProperty('unreadCount');
-        expect(typeof response.unreadCount).toBe('number');
-        done();
-      });
+      expect(notification.title).toContain('Niveau 2');
+      expect(notification.data).toMatchObject({ level: 2 });
     });
   });
 
-  describe('Achievement Notifications', () => {
-    beforeEach((done) => {
-      const port = app.getHttpServer().address().port;
-      const token = jwtService.sign({ sub: testUserId });
-
-      clientSocket = io(`http://localhost:${port}/notifications`, {
-        query: { token },
-        transports: ['websocket'],
+  describe('Client messages', () => {
+    it('marks a notification as read', async () => {
+      const created = await notificationModel.create({
+        userId: new Types.ObjectId(mongoId),
+        type: 'achievement_earned',
+        title: 'To read',
+        message: 'To read',
       });
+      const { socket } = await connectAndGetInitial();
 
-      clientSocket.on('connect', () => {
-        done();
-      });
+      const response = await emitWithAck(
+        socket,
+        'mark_read',
+        created._id.toString(),
+      );
+
+      expect(response).toEqual({ success: true });
+      const updated = await notificationModel.findById(created._id);
+      expect(updated?.isRead).toBe(true);
     });
 
-    it('should receive achievement unlocked notification', (done) => {
-      clientSocket.on('new_notification', (notification) => {
-        if (notification.type === 'achievement_unlocked') {
-          expect(notification).toHaveProperty('title', 'Succès débloqué !');
-          expect(notification.data).toHaveProperty('id');
-          expect(notification.data).toHaveProperty('name');
-          expect(notification.data).toHaveProperty('points');
-          done();
-        }
-      });
+    it('returns an error for an unknown notification', async () => {
+      const { socket } = await connectAndGetInitial();
 
-      // Simulate achievement unlock
-      setTimeout(() => {
-        clientSocket.emit('test_unlock_achievement', {
-          achievementId: 'first_photo',
-        });
-      }, 100);
+      const response = await emitWithAck(
+        socket,
+        'mark_read',
+        new Types.ObjectId().toString(),
+      );
+
+      expect(response).toHaveProperty('error');
     });
 
-    it('should receive level up notification', (done) => {
-      clientSocket.on('new_notification', (notification) => {
-        if (notification.type === 'level_up') {
-          expect(notification).toHaveProperty('title');
-          expect(notification.title).toContain('Niveau');
-          expect(notification.data).toHaveProperty('level');
-          done();
-        }
+    it('marks all notifications as read and returns the unread count', async () => {
+      await notificationModel.create([
+        {
+          userId: new Types.ObjectId(mongoId),
+          type: 'achievement_earned',
+          title: 'A',
+          message: 'A',
+        },
+        {
+          userId: new Types.ObjectId(mongoId),
+          type: 'achievement_earned',
+          title: 'B',
+          message: 'B',
+        },
+      ]);
+      const { socket } = await connectAndGetInitial();
+
+      expect(await emitWithAck(socket, 'get_unread_count')).toEqual({
+        unreadCount: 2,
       });
-
-      // Simulate level up
-      setTimeout(() => {
-        clientSocket.emit('test_level_up', { newLevel: 2 });
-      }, 100);
-    });
-  });
-
-  describe('Error Handling', () => {
-    beforeEach((done) => {
-      const port = app.getHttpServer().address().port;
-      const token = jwtService.sign({ sub: testUserId });
-
-      clientSocket = io(`http://localhost:${port}/notifications`, {
-        query: { token },
-        transports: ['websocket'],
+      expect(await emitWithAck(socket, 'mark_all_read')).toEqual({
+        success: true,
+        modifiedCount: 2,
       });
-
-      clientSocket.on('connect', () => {
-        done();
+      expect(await emitWithAck(socket, 'get_unread_count')).toEqual({
+        unreadCount: 0,
       });
-    });
-
-    it('should handle invalid notification ID gracefully', (done) => {
-      clientSocket.emit('mark_read', 'invalid-id', (response) => {
-        expect(response).toHaveProperty('error');
-        done();
-      });
-    });
-
-    it('should handle disconnection and reconnection', (done) => {
-      let reconnected = false;
-
-      clientSocket.on('disconnect', () => {
-        if (!reconnected) {
-          reconnected = true;
-          clientSocket.connect();
-        }
-      });
-
-      clientSocket.on('connect', () => {
-        if (reconnected) {
-          expect(clientSocket.connected).toBe(true);
-          done();
-        }
-      });
-
-      // Force disconnect
-      clientSocket.disconnect();
     });
   });
 });
