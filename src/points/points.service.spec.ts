@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { GamificationService } from '../gamification/gamification.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { PointsService } from './points.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { PhotosService } from '../photos/photos.service';
@@ -96,6 +98,11 @@ describe('PointsService', () => {
         },
         { provide: UsersService, useValue: mockUsersService },
         { provide: CacheService, useValue: mockCacheService },
+        {
+          provide: GamificationService,
+          useValue: { awardPointsForPOICreation: jest.fn() },
+        },
+        { provide: NotificationsGateway, useValue: {} },
       ],
     }).compile();
 

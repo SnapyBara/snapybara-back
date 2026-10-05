@@ -198,4 +198,117 @@ describe('UsersService', () => {
       expect(result).toEqual(created as any);
     });
   });
+
+  describe('create conflicts', () => {
+    const dto = {
+      email: 'new@test.com',
+      supabaseId: 'new-supabase',
+      username: 'newname',
+    };
+    const withExisting = (existing: any) => {
+      service['userModel'] = Object.assign(jest.fn(), {
+        findOne: jest.fn().mockResolvedValue(existing),
+      }) as any;
+    };
+
+    it.each([
+      [{ email: dto.email }, 'Email already exists'],
+      [{ supabaseId: dto.supabaseId }, 'Supabase ID already exists'],
+      [{ username: dto.username }, 'Username already exists'],
+      [{}, 'User already exists'],
+    ])('rejects %o', async (existing, message) => {
+      withExisting(existing);
+
+      await expect(service.create(dto as any)).rejects.toThrow(message);
+    });
+
+    it('maps a duplicate key error to a conflict', async () => {
+      const save = jest
+        .fn()
+        .mockRejectedValue({ code: 11000, keyPattern: { email: 1 } });
+      service['userModel'] = Object.assign(
+        jest.fn().mockImplementation(() => ({ save })),
+        { findOne: jest.fn().mockResolvedValue(null) },
+      ) as any;
+
+      await expect(service.create(dto as any)).rejects.toThrow(
+        'email already exists',
+      );
+    });
+  });
+
+  describe('counters and level', () => {
+    beforeEach(() => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        ...mockUser,
+        photosUploaded: 1,
+        pointsOfInterestCreated: 2,
+        commentsWritten: 3,
+        likesReceived: 4,
+      } as any);
+      jest.spyOn(service, 'update').mockResolvedValue(mockUser);
+    });
+
+    it('updates the level', async () => {
+      await service.updateLevel('123', 4);
+      expect(service.update).toHaveBeenCalledWith('123', { level: 4 });
+    });
+
+    it.each([
+      ['incrementPhotoCount', { photosUploaded: 2 }],
+      ['incrementPOICount', { pointsOfInterestCreated: 3 }],
+      ['incrementCommentCount', { commentsWritten: 4 }],
+      ['incrementLikesReceived', { likesReceived: 5 }],
+    ])('%s increments the counter', async (method, expected) => {
+      await service[method]('123');
+      expect(service.update).toHaveBeenCalledWith('123', expected);
+    });
+  });
+
+  describe('syncWithSupabase edge cases', () => {
+    it('rejects a payload without id', async () => {
+      await expect(service.syncWithSupabase({})).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('never sets the same path in $setOnInsert and $set', async () => {
+      model.findOneAndUpdate.mockResolvedValue(mockUser);
+
+      await service.syncWithSupabase({
+        id: 'supabase123',
+        email: 't@t.com',
+        raw_user_meta_data: { username: 'Some User', language: 'en' },
+      });
+
+      const update = model.findOneAndUpdate.mock.calls[0][1];
+      const overlap = Object.keys(update.$setOnInsert).filter(
+        (key) => key in update.$set,
+      );
+      expect(overlap).toEqual([]);
+      expect(update.$set).toMatchObject({
+        username: 'someuser',
+        language: 'en',
+      });
+    });
+
+    it('retries once on a concurrent upsert duplicate', async () => {
+      model.findOneAndUpdate
+        .mockRejectedValueOnce({ code: 11000, keyPattern: { supabaseId: 1 } })
+        .mockResolvedValueOnce(mockUser);
+
+      await expect(
+        service.syncWithSupabase({ id: 'supabase123' }),
+      ).resolves.toEqual(mockUser);
+      expect(model.findOneAndUpdate).toHaveBeenCalledTimes(2);
+    });
+
+    it('rethrows other errors', async () => {
+      model.findOneAndUpdate.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        service.syncWithSupabase({ id: 'supabase123' }),
+      ).rejects.toThrow('db down');
+    });
+  });
 });

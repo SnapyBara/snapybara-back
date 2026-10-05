@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { GamificationService } from '../gamification/gamification.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { PointsService } from './points.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { PhotosService } from '../photos/photos.service';
@@ -42,6 +44,11 @@ describe('PointsService Extended Tests', () => {
   };
 
   const mockPointModel = createMockPointModel();
+  const mockGamificationService = {
+    awardPointsForPOICreation: jest.fn(),
+    awardPointsForPOIValidation: jest.fn(),
+  };
+  const mockNotificationsGateway = { sendNotificationToUser: jest.fn() };
   const mockPhotosService = {
     uploadPhoto: jest.fn(),
     findByPoint: jest.fn(),
@@ -89,6 +96,8 @@ describe('PointsService Extended Tests', () => {
         },
         { provide: UsersService, useValue: mockUsersService },
         { provide: CacheService, useValue: mockCacheService },
+        { provide: GamificationService, useValue: mockGamificationService },
+        { provide: NotificationsGateway, useValue: mockNotificationsGateway },
       ],
     }).compile();
 
@@ -215,7 +224,7 @@ describe('PointsService Extended Tests', () => {
       const mockPoint = { _id: pointId, status: 'pending' };
       const mockUpdatedPoint = { ...mockPoint, status: 'approved' };
 
-      mockPointModel.findById.mockResolvedValueOnce(mockPoint);
+      mockPointModel.populate.mockResolvedValueOnce(mockPoint);
       mockPointModel.exec.mockResolvedValueOnce(mockUpdatedPoint);
 
       const result = await service.updatePointStatus(
@@ -241,7 +250,7 @@ describe('PointsService Extended Tests', () => {
       const mockPoint = { _id: pointId, status: 'pending' };
       const mockUpdatedPoint = { ...mockPoint, status: 'rejected' };
 
-      mockPointModel.findById.mockResolvedValueOnce(mockPoint);
+      mockPointModel.populate.mockResolvedValueOnce(mockPoint);
       mockPointModel.exec.mockResolvedValueOnce(mockUpdatedPoint);
 
       const result = await service.updatePointStatus(
@@ -262,6 +271,64 @@ describe('PointsService Extended Tests', () => {
         }),
         { new: true },
       );
+    });
+  });
+
+  describe('updatePointStatus approval rewards', () => {
+    const pointId = new Types.ObjectId().toString();
+    const ownerId = new Types.ObjectId().toString();
+    const approved = { _id: pointId, name: 'Spot', status: 'approved' };
+
+    const approve = async (point: any) => {
+      mockPointModel.populate.mockResolvedValueOnce(point);
+      mockPointModel.exec.mockResolvedValueOnce(approved);
+      return service.updatePointStatus(pointId, 'approved', 'admin-123');
+    };
+
+    beforeEach(() => {
+      mockGamificationService.awardPointsForPOIValidation.mockReset();
+      mockNotificationsGateway.sendNotificationToUser.mockReset();
+    });
+
+    it.each([
+      ['a populated user', { _id: ownerId }],
+      ['an ObjectId', new Types.ObjectId(ownerId)],
+    ])('rewards the owner referenced by %s', async (_label, userId) => {
+      await approve({ _id: pointId, status: 'pending', userId });
+
+      expect(
+        mockGamificationService.awardPointsForPOIValidation,
+      ).toHaveBeenCalledWith(ownerId);
+      expect(
+        mockNotificationsGateway.sendNotificationToUser,
+      ).toHaveBeenCalledWith(
+        ownerId,
+        expect.objectContaining({
+          type: 'point_approved',
+          data: expect.objectContaining({ entityId: pointId }),
+        }),
+      );
+    });
+
+    it('does not reward an already approved point', async () => {
+      await approve({ _id: pointId, status: 'approved', userId: ownerId });
+
+      expect(
+        mockGamificationService.awardPointsForPOIValidation,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('still returns the point when rewarding fails', async () => {
+      mockGamificationService.awardPointsForPOIValidation.mockRejectedValueOnce(
+        new Error('fail'),
+      );
+
+      await expect(
+        approve({ _id: pointId, status: 'pending', userId: ownerId }),
+      ).resolves.toEqual(approved);
+      expect(
+        mockNotificationsGateway.sendNotificationToUser,
+      ).not.toHaveBeenCalled();
     });
   });
 

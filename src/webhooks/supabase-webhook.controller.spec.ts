@@ -25,6 +25,7 @@ describe('SupabaseWebhookController', () => {
 
   beforeEach(async () => {
     process.env.SUPABASE_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.NODE_ENV = 'test'; // Définir l'environnement comme test (pas production)
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SupabaseWebhookController],
       providers: [
@@ -118,14 +119,48 @@ describe('SupabaseWebhookController', () => {
       });
     });
 
-    it('should throw unauthorized exception without auth header', async () => {
+    it('should not throw but log warning without auth header in development', async () => {
+      process.env.NODE_ENV = 'development';
+      const payload = { type: 'INSERT', table: 'users', record: {} };
+      const result = await controller.handleSupabaseAuthEvent(
+        payload,
+        undefined,
+      );
+      expect(Logger.prototype.warn).toHaveBeenCalledWith(
+        'Missing webhook signature but secret is configured',
+      );
+      expect(result).toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
+      });
+    });
+
+    it('should not throw but log warning with invalid auth header in development', async () => {
+      process.env.NODE_ENV = 'development';
+      const payload = { type: 'INSERT', table: 'users', record: {} };
+      const result = await controller.handleSupabaseAuthEvent(
+        payload,
+        'invalid-signature',
+      );
+      expect(Logger.prototype.warn).toHaveBeenCalledWith(
+        'Invalid webhook signature',
+      );
+      expect(result).toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
+      });
+    });
+
+    it('should throw unauthorized exception without auth header in production', async () => {
+      process.env.NODE_ENV = 'production';
       const payload = { type: 'INSERT', table: 'users', record: {} };
       await expect(
         controller.handleSupabaseAuthEvent(payload, undefined),
       ).rejects.toThrow('Missing webhook signature');
     });
 
-    it('should throw unauthorized exception with invalid auth header', async () => {
+    it('should throw unauthorized exception with invalid auth header in production', async () => {
+      process.env.NODE_ENV = 'production';
       const payload = { type: 'INSERT', table: 'users', record: {} };
       await expect(
         controller.handleSupabaseAuthEvent(payload, 'invalid-signature'),
@@ -167,6 +202,135 @@ describe('SupabaseWebhookController', () => {
         success: true,
         message: 'Webhook processed successfully',
       });
+    });
+  });
+
+  describe('testWebhook', () => {
+    it('reports the webhook configuration', async () => {
+      await expect(controller.testWebhook()).resolves.toMatchObject({
+        status: 'ok',
+        configuration: { secretConfigured: true, environment: 'test' },
+      });
+    });
+  });
+
+  describe('without webhook secret', () => {
+    beforeEach(() => {
+      delete process.env.SUPABASE_WEBHOOK_SECRET;
+    });
+
+    it('processes the event without verifying the signature', async () => {
+      const payload = { type: 'INSERT', table: 'users', record: { id: 'u1' } };
+
+      await expect(
+        controller.handleSupabaseAuthEvent(payload, undefined),
+      ).resolves.toEqual({
+        success: true,
+        message: 'Webhook processed successfully',
+      });
+      expect(mockUsersService.syncWithSupabase).toHaveBeenCalledWith(
+        payload.record,
+      );
+    });
+
+    it('logs an error when a signature is sent in production', async () => {
+      process.env.NODE_ENV = 'production';
+
+      await controller.handleSupabaseAuthEvent(
+        { type: 'UNKNOWN' },
+        'some-signature',
+      );
+
+      expect(Logger.prototype.error).toHaveBeenCalledWith(
+        'Webhook signature provided but no secret configured to verify it',
+      );
+    });
+  });
+
+  describe('user events', () => {
+    it('syncs the user on UPDATE', async () => {
+      const payload = {
+        type: 'UPDATE',
+        table: 'auth.users',
+        record: { id: 'u1', email: 'a@b.c' },
+      };
+      mockUsersService.syncWithSupabase.mockResolvedValue({ username: 'a' });
+
+      await controller.handleSupabaseAuthEvent(payload, sign(payload));
+
+      expect(mockUsersService.syncWithSupabase).toHaveBeenCalledWith(
+        payload.record,
+      );
+    });
+
+    it('logs when the UPDATE sync fails', async () => {
+      const payload = {
+        type: 'UPDATE',
+        table: 'users',
+        record: { id: 'u1', email: 'a@b.c' },
+      };
+      mockUsersService.syncWithSupabase.mockRejectedValue(new Error('db'));
+
+      await expect(
+        controller.handleSupabaseAuthEvent(payload, sign(payload)),
+      ).resolves.toMatchObject({ success: true });
+      expect(Logger.prototype.error).toHaveBeenCalled();
+    });
+
+    it('logs when the INSERT sync fails', async () => {
+      const payload = {
+        type: 'INSERT',
+        table: 'users',
+        record: { id: 'u1', email: 'a@b.c' },
+      };
+      mockUsersService.syncWithSupabase.mockRejectedValue(new Error('db'));
+
+      await expect(
+        controller.handleSupabaseAuthEvent(payload, sign(payload)),
+      ).resolves.toMatchObject({ success: true });
+      expect(Logger.prototype.error).toHaveBeenCalled();
+    });
+
+    it('soft deletes the user on DELETE', async () => {
+      const payload = {
+        type: 'DELETE',
+        table: 'auth.users',
+        old_record: { id: 'u1', email: 'a@b.c' },
+      };
+      const mongoUser = { isActive: true, save: jest.fn() };
+      mockUsersService.findBySupabaseId.mockResolvedValue(mongoUser);
+
+      await controller.handleSupabaseAuthEvent(payload, sign(payload));
+
+      expect(mongoUser.isActive).toBe(false);
+      expect(mongoUser.save).toHaveBeenCalled();
+    });
+
+    it('ignores DELETE for an unknown user', async () => {
+      const payload = {
+        type: 'DELETE',
+        table: 'users',
+        old_record: { id: 'u1' },
+      };
+      mockUsersService.findBySupabaseId.mockResolvedValue(null);
+
+      await expect(
+        controller.handleSupabaseAuthEvent(payload, sign(payload)),
+      ).resolves.toMatchObject({ success: true });
+    });
+
+    it('logs when the DELETE fails', async () => {
+      const payload = {
+        type: 'DELETE',
+        table: 'users',
+        old_record: { id: 'u1' },
+      };
+      mockUsersService.findBySupabaseId.mockRejectedValue(new Error('db'));
+
+      await expect(
+        controller.handleSupabaseAuthEvent(payload, sign(payload)),
+      ).resolves.toMatchObject({ success: true });
+      expect(Logger.prototype.error).toHaveBeenCalled();
     });
   });
 });

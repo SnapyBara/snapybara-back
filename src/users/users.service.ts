@@ -18,30 +18,49 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
     try {
+      // Check for existing user, but only check username if it's provided
+      const orConditions: any[] = [
+        { email: createUserDto.email },
+        { supabaseId: createUserDto.supabaseId },
+      ];
+
+      // Only check username if it's provided
+      if (createUserDto.username) {
+        orConditions.push({ username: createUserDto.username });
+      }
+
       const existingUser = await this.userModel.findOne({
-        $or: [
-          { email: createUserDto.email },
-          { username: createUserDto.username },
-          { supabaseId: createUserDto.supabaseId },
-        ],
+        $or: orConditions,
       });
 
       if (existingUser) {
-        throw new ConflictException(
-          'Utilisateur déjà existant (email, username ou supabaseId)',
-        );
+        if (existingUser.email === createUserDto.email) {
+          throw new ConflictException('Email already exists');
+        }
+        if (existingUser.supabaseId === createUserDto.supabaseId) {
+          throw new ConflictException('Supabase ID already exists');
+        }
+        if (
+          createUserDto.username &&
+          existingUser.username === createUserDto.username
+        ) {
+          throw new ConflictException('Username already exists');
+        }
+        throw new ConflictException('User already exists');
       }
 
       const createdUser = new this.userModel(createUserDto);
       const savedUser = await createdUser.save();
 
       this.logger.log(
-        `User created: ${savedUser.username} (${savedUser.email})`,
+        `User created: ${savedUser.username || 'NO USERNAME'} (${savedUser.email})`,
       );
       return savedUser;
     } catch (error) {
       if (error.code === 11000) {
-        throw new ConflictException('Utilisateur déjà existant');
+        // Handle duplicate key error
+        const field = Object.keys(error.keyPattern)[0];
+        throw new ConflictException(`${field} already exists`);
       }
       throw error;
     }
@@ -137,6 +156,38 @@ export class UsersService {
       `Points added to ${user.username}: +${points} (total: ${newPoints}, level: ${newLevel})`,
     );
     return updatedUser;
+  }
+
+  async updateLevel(id: string, level: number): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    const updatedUser = await this.update(id, {
+      level: level,
+    });
+
+    this.logger.log(`Level updated for ${user.username}: ${level}`);
+    return updatedUser;
+  }
+
+  async incrementPhotoCount(id: string): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    return this.update(id, { photosUploaded: user.photosUploaded + 1 });
+  }
+
+  async incrementPOICount(id: string): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    return this.update(id, {
+      pointsOfInterestCreated: user.pointsOfInterestCreated + 1,
+    });
+  }
+
+  async incrementCommentCount(id: string): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    return this.update(id, { commentsWritten: user.commentsWritten + 1 });
+  }
+
+  async incrementLikesReceived(id: string): Promise<UserDocument> {
+    const user = await this.findOne(id);
+    return this.update(id, { likesReceived: user.likesReceived + 1 });
   }
 
   async addAchievement(
@@ -242,6 +293,11 @@ export class UsersService {
       supabaseUser?.user_metadata?.language ||
       supabaseUser?.raw_user_meta_data?.language;
 
+    // Log extracted username for debugging
+    this.logger.log(
+      `Extracted username for ${email}: ${username ? `'${username}'` : 'undefined/null'}`,
+    );
+
     const update: any = {
       $setOnInsert: {
         supabaseId,
@@ -250,7 +306,7 @@ export class UsersService {
         notificationsEnabled: true,
         darkModeEnabled: false,
         privacySettings: 'public',
-        language: language ?? 'fr',
+        ...(language ? {} : { language: 'fr' }),
         level: 1,
         points: 0,
         photosUploaded: 0,
@@ -260,64 +316,62 @@ export class UsersService {
       },
       $set: {
         ...(email ? { email } : {}),
+        // Only update username if explicitly provided
         ...(username ? { username } : {}),
         ...(typeof isEmailVerified === 'boolean' ? { isEmailVerified } : {}),
         ...(profilePicture ? { profilePicture } : {}),
-        ...(language ? { language } : {}), // met à jour si fourni
+        ...(language ? { language } : {}),
         ...(metadata ? { metadata } : {}),
         lastLoginAt: new Date(),
         updatedAt: new Date(),
       },
     };
 
+    // A path cannot appear in both $setOnInsert and $set (MongoDB conflict error).
+    const upsert = () =>
+      this.userModel.findOneAndUpdate({ supabaseId }, update, {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      });
+
+    let doc: UserDocument;
     try {
-      const doc = await this.userModel.findOneAndUpdate(
-        { supabaseId },
-        update,
-        { upsert: true, new: true, setDefaultsOnInsert: true },
-      );
-      this.logger.log(`User synced: ${doc.username}`);
-      return doc;
+      doc = await upsert();
     } catch (error: any) {
-      if (error?.code === 11000) {
-        const base =
-          username ||
-          (email
-            ? email
-                .split('@')[0]
-                .toLowerCase()
-                .replace(/[^a-z0-9]/g, '')
-            : 'user');
-        const unique = await this.generateUniqueUsername({
-          email,
-          user_metadata: { full_name: base },
-        });
-        const retryUpdate = {
-          ...update,
-          $set: { ...update.$set, username: unique }, // uniquement dans $set
-        };
-        const doc = await this.userModel.findOneAndUpdate(
-          { supabaseId },
-          retryUpdate,
-          { upsert: true, new: true, setDefaultsOnInsert: true },
-        );
-        return doc;
+      // Concurrent upserts on the same supabaseId: retry once as an update.
+      if (error?.code === 11000 && error?.keyPattern?.supabaseId) {
+        doc = await upsert();
+      } else {
+        throw error;
       }
-      throw error;
     }
+
+    // Log the actual username value in the document
+    const actualUsername = doc.username;
+    this.logger.log(
+      `User synced: ${doc.email} (username in DB: ${
+        actualUsername === undefined
+          ? 'undefined'
+          : actualUsername === null
+            ? 'null'
+            : actualUsername === ''
+              ? 'empty string'
+              : `'${actualUsername}'`
+      })`,
+    );
+
+    return doc;
   }
 
   // ===== UTILS =====
 
   private extractUsername(record: any): string | undefined {
     const meta = record?.raw_user_meta_data || record?.user_metadata || {};
-    const candidate: string | undefined =
-      meta.username ||
-      meta.full_name ||
-      meta.name ||
-      (typeof record?.email === 'string'
-        ? record.email.split('@')[0]
-        : undefined);
+
+    // Only use username if explicitly provided in metadata
+    // Don't auto-generate from email or name
+    const candidate: string | undefined = meta.username;
 
     if (!candidate || typeof candidate !== 'string') return undefined;
     return candidate.trim().replace(/\s+/g, '').toLowerCase();

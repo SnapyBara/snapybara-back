@@ -27,7 +27,13 @@ describe('NotificationsService', () => {
 
   const mockNotificationModel = jest.fn().mockImplementation((dto) => ({
     ...dto,
-    save: jest.fn().mockResolvedValue({ ...mockNotification, ...dto }),
+    save: jest.fn().mockResolvedValue({
+      ...mockNotification,
+      ...dto,
+      toObject() {
+        return { ...mockNotification, ...dto };
+      },
+    }),
   })) as any;
 
   mockNotificationModel.create = jest.fn();
@@ -236,6 +242,25 @@ describe('NotificationsService', () => {
   });
 
   describe('notification helper methods', () => {
+    it('should create point approved notification', async () => {
+      const ownerId = new Types.ObjectId().toString();
+      const pointId = new Types.ObjectId().toString();
+
+      await service.notifyPointApproved(ownerId, 'Tour Eiffel', pointId);
+
+      expect(mockNotificationModel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'point_approved',
+          priority: 'medium',
+          data: {
+            entityType: 'point',
+            entityId: pointId,
+            pointName: 'Tour Eiffel',
+          },
+        }),
+      );
+    });
+
     it('should create photo liked notification', async () => {
       const ownerId = new Types.ObjectId().toString();
       const likerId = new Types.ObjectId().toString();
