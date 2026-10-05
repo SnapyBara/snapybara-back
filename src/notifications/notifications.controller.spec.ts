@@ -195,4 +195,32 @@ describe('NotificationsController', () => {
       expect(result).toEqual(response);
     });
   });
+
+  describe('when the mongo user is missing', () => {
+    const req = { user: { sub: 'unknown' } };
+
+    beforeEach(() => {
+      mockUsersService.findBySupabaseId.mockResolvedValue(null);
+    });
+
+    it('returns an empty list', async () => {
+      await expect(controller.findByUser(req)).resolves.toEqual({
+        data: [],
+        total: 0,
+        unreadCount: 0,
+        page: 1,
+        limit: 20,
+      });
+      expect(mockNotificationsService.findByUser).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['markAsRead', () => controller.markAsRead('id', req)],
+      ['markAllAsRead', () => controller.markAllAsRead(req)],
+      ['deleteNotification', () => controller.deleteNotification('id', req)],
+      ['clearOldNotifications', () => controller.clearOldNotifications(req)],
+    ])('%s throws', async (_name, call) => {
+      await expect(call()).rejects.toThrow('User not found');
+    });
+  });
 });

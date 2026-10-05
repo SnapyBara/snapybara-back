@@ -506,4 +506,31 @@ describe('UsersController', () => {
       });
     });
   });
+
+  describe('checkUsernameAvailability validation', () => {
+    it.each(['ab', 'a'.repeat(21), 'bad name!'])(
+      'rejects the invalid username "%s"',
+      async (username) => {
+        await expect(
+          controller.checkUsernameAvailability(username),
+        ).rejects.toThrow(HttpException);
+        expect(mockUsersService.findByUsername).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe('user response formatting', () => {
+    it('returns a null username when it is not set', async () => {
+      mockUsersService.create.mockResolvedValue({
+        ...mockUser,
+        username: '',
+        toObject: jest.fn().mockReturnValue({ ...mockUser, username: '' }),
+      });
+
+      const result = await controller.create({} as any);
+
+      expect(result.username).toBeNull();
+      expect(result._id).toBe(mockUser._id);
+    });
+  });
 });
